@@ -38,9 +38,6 @@ proc doGet(c: Client, r: HttpReq): Future[int] {.async.} =
 
         var fileBlock: string
 
-        if true:
-            raise newException(ValueError, "Oops!")
-
         await c.writer.write($resp)
         fileBlock = await f.read(8192)
 
