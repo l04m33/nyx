@@ -20,7 +20,20 @@ proc handleClient(client: Client): Future[Client] {.async.} =
             debug("cid = $#, failed to parse request method" % [$cid])
         return client
 
-    var status = await methodHandlers[req.meth.toUpper()](client, req)
+    var status: int
+    try:
+        status = await methodHandlers[req.meth.toUpper()](client, req)
+    except:
+        status = -1
+        client.closeOpenFiles()
+        var msg = getCurrentExceptionMsg()
+        debug("method handler failed, msg = $#" % [msg])
+
+    if status < 0:
+        status = 500
+        var resp = newHttpResp(500)
+        await client.writer.write($resp)
+
     when not defined(nolog):
         var cid = client.id()
         debug("cid = $#, status = $#" % [$cid, $status])

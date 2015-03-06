@@ -28,16 +28,7 @@ proc doGet(c: Client, r: HttpReq): Future[int] {.async.} =
 
     if existsFile(path):
         var fileSize = getFileSize(path)
-        var f =
-            try:
-                openAsync(path)
-            except:
-                nil
-
-        if isNil(f):
-            resp = newHttpResp(500)
-            await c.writer.write($resp)
-            return 500
+        var f = c.openFile(path)
 
         resp = newHttpResp(200)
         resp.headers.add((key: "Content-Length", value: $fileSize))
@@ -47,22 +38,16 @@ proc doGet(c: Client, r: HttpReq): Future[int] {.async.} =
 
         var fileBlock: string
 
-        try:
-            await c.writer.write($resp)
-            fileBlock = await f.read(8192)
-        except:
-            debug("IO error: $#" % [getCurrentExceptionMsg()])
-            f.close()
-            raise
+        if true:
+            raise newException(ValueError, "Oops!")
+
+        await c.writer.write($resp)
+        fileBlock = await f.read(8192)
 
         while fileBlock != "":
-            try:
-                await c.writer.write(fileBlock)
-                fileBlock = await f.read(8192)
-            except:
-                debug("IO error: $#" % [getCurrentExceptionMsg()])
-                f.close()
-                raise
+            await c.writer.write(fileBlock)
+            fileBlock = await f.read(8192)
+
         f.close()
         return 200
     else:
