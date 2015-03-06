@@ -50,7 +50,7 @@ proc serve*(server: Server, handler: ClientHandler) {.async.} =
         var client = newClient(clientSocket, handler)
         var cid = client.id()
         server.clients[cid] = client
-        debug("serve: new client: " % [$cid])
+        debug("serve: new client: $#" % [$cid])
 
         client.future.callback =
             proc(f: Future[Client]) =
