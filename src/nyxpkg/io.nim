@@ -12,11 +12,11 @@ type
 
 
 proc read*(r: Reader, size: int): Future[string] {.async.} =
-    result = await r.readImpl(r, size)
+    return (await r.readImpl(r, size))
 
 
 proc readLine*(r: Reader): Future[string] {.async.} =
-    result = await r.readLineImpl(r)
+    return (await r.readLineImpl(r))
 
 
 type
@@ -39,12 +39,12 @@ type
 
 proc asRead*(r: Reader, size: int): Future[string] {.async.} =
     var sr = AsyncSocketReader(r)
-    result = await sr.socket.recv(size)
+    return (await sr.socket.recv(size))
 
 
 proc asReadLine*(r: Reader): Future[string] {.async.} =
     var sr = AsyncSocketReader(r)
-    result = await sr.socket.recvLine()
+    return (await sr.socket.recvLine())
 
 
 proc newAsyncSocketReader*(socket: AsyncSocket): AsyncSocketReader =
