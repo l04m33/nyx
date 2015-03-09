@@ -14,7 +14,7 @@ import
 proc handleClient(client: Client): Future[Client] {.async.} =
     var req = await newHttpReq(client.reader)
 
-    if req.meth == nil:
+    if isNil(req.meth):
         when not defined(nolog):
             var cid = client.id()
             debug("cid = $#, failed to parse request method" % [$cid])

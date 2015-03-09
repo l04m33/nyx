@@ -96,7 +96,7 @@ proc newHttpReq*(r: Reader): Future[HttpReq] {.async.} =
 
     if reqLine.len() > 0:
         parseRequestLine(reqLine, result)
-        if result.meth == nil or result.path == nil:
+        if isNil(result.meth) or isNil(result.path):
             result.meth = nil
             return
     else:

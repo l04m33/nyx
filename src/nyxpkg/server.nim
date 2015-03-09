@@ -61,7 +61,7 @@ proc serve*(server: Server, handler: ClientHandler) {.async.} =
                     except:
                         c = nil
 
-                    if c == nil:
+                    if isNil(c):
                         for fd, cc in pairs(server.clients):
                             if cc.future == f:
                                 debug("removing client = $#, f.failed() = $#" % [$fd, $(f.failed())])
