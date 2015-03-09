@@ -30,6 +30,15 @@ method getHeader*(r: HttpBase, key: string): seq[string] =
                 result.add(h.value)
 
 
+method getFirstHeader*(r: HttpBase, key: string): string =
+    if not isNil(r.headers):
+        let upperKey = key.toUpper()
+        for h in items(r.headers):
+            if h.key.toUpper() == upperKey:
+                return h.value
+    return nil
+
+
 method writeHeaders*(r: HttpBase): seq[string] =
     result = @[]
     for h in items(r.headers):

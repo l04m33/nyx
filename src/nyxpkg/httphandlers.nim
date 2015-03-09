@@ -41,8 +41,8 @@ proc handleHttpClient*(client: Client): Future[Client] {.async, procvar.} =
         if not isNil(req.meth):
             discard (await handleHttpRequest(client, req))
 
-            var connectionHeader = req.getHeader("Connection")
-            if connectionHeader.len() <= 0 or connectionHeader[0].toUpper() == "KEEP-ALIVE":
+            var connVal = req.getFirstHeader("Connection")
+            if isNil(connVal) or connVal.toUpper() == "KEEP-ALIVE":
                 continue
             else:
                 client.close()
