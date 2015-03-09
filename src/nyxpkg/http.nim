@@ -22,11 +22,12 @@ type
 
 
 method getHeader*(r: HttpBase, key: string): seq[string] =
-    let upperKey = key.toUpper()
     result = @[]
-    for h in items(r.headers):
-        if h.key.toUpper() == upperKey:
-            result.add(h.value)
+    if not isNil(r.headers):
+        let upperKey = key.toUpper()
+        for h in items(r.headers):
+            if h.key.toUpper() == upperKey:
+                result.add(h.value)
 
 
 method writeHeaders*(r: HttpBase): seq[string] =
@@ -117,7 +118,7 @@ proc newHttpReq*(r: Reader): Future[HttpReq] {.async.} =
 
 
 type
-    THttpResp* = object of HttpBase
+    THttpResp* = object of THttpBase
         protocol*: string
         version*: HttpVersion
         status*: int
@@ -131,9 +132,7 @@ proc newHttpResp*(status: int): HttpResp =
     result.version = (major: 1, minor: 1)
     result.status = status
     result.headers = @[
-        (key: "Server", value: "Nyx 0.1.0"),
-        # TODO: keep-alive
-        (key: "Connection", value: "Close")
+        (key: "Server", value: "Nyx 0.1.0")
     ]
 
 

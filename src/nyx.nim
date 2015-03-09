@@ -11,14 +11,9 @@ import
     nyxpkg/logging
 
 
-proc handleClient(client: Client): Future[Client] {.async.} =
-    var req = await newHttpReq(client.reader)
-
-    if isNil(req.meth):
-        when not defined(nolog):
-            var cid = client.id()
-            debug("cid = $#, failed to parse request method" % [$cid])
-        return client
+proc handleRequest(client: Client, req: HttpReq): Future[int] {.async.} =
+    when not defined(nolog):
+        var cid = client.id()
 
     var status: int
     try:
@@ -33,10 +28,28 @@ proc handleClient(client: Client): Future[Client] {.async.} =
         status = 500
         var resp = newHttpResp(500)
         await client.writer.write($resp)
+        return 500
 
     when not defined(nolog):
-        var cid = client.id()
         debug("cid = $#, status = $#" % [$cid, $status])
+
+    return status
+
+
+proc handleClient(client: Client): Future[Client] {.async.} =
+    while not client.isClosed():
+        var req = await newHttpReq(client.reader)
+
+        if not isNil(req.meth):
+            discard (await handleRequest(client, req))
+
+            var connectionHeader = req.getHeader("Connection")
+            if connectionHeader.len() <= 0 or connectionHeader[0].toUpper() == "KEEP-ALIVE":
+                continue
+            else:
+                client.close()
+        else:
+            client.close()
 
     return client
 

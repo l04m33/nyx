@@ -32,10 +32,14 @@ proc newServer*(address: string, port: uint16): Server =
 
 
 proc purgeClient*(server: Server, clientId: int) =
+    debug("removing cid = $#" % [$clientId])
+
     var client = server.clients[clientId]
     server.clients.del(clientId)
+
     debug("new client number: $#" % [$(server.clients.len())])
     debug("closing cid = $#, openFiles.len() = $#" % [$clientId, $client.openFiles.len()])
+
     client.close()
 
 
@@ -54,20 +58,13 @@ proc serve*(server: Server, handler: ClientHandler) {.async.} =
 
         client.future.callback =
             proc(f: Future[Client]) =
-                if finished(f):
-                    var c: Client
-                    try:
-                        c = f.read()
-                    except:
-                        c = nil
-
-                    if isNil(c):
-                        for fd, cc in pairs(server.clients):
-                            if cc.future == f:
-                                debug("removing client = $#, f.failed() = $#" % [$fd, $(f.failed())])
-                                server.purgeClient(fd)
-                                break
-                    else:
-                        var cid = c.id()
-                        debug("removing cid = $#" % [$cid])
-                        server.purgeClient(cid)
+                if f.failed():
+                    if not isNil(f.errorStackTrace) and f.errorStackTrace != "":
+                        debug("$#" % [f.errorStackTrace])
+                    for fd, c in pairs(server.clients):
+                        if c.future == f:
+                            server.purgeClient(fd)
+                            break
+                else:
+                    var c = f.read()
+                    server.purgeClient(c.id())

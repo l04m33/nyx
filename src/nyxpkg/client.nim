@@ -48,6 +48,10 @@ proc close*(c: Client) =
     c.socket.close()
 
 
+proc isClosed*(c: Client): bool =
+    return (c.socket.isClosed())
+
+
 proc openFile*(c: Client, filename: string, mode: FileMode = fmRead): ClientOpenFile =
     new(result)
     result.client = c
