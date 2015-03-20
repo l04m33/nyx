@@ -92,12 +92,22 @@ proc testWriteHttpResp() =
     check($resp == "HTTP/1.1 200 OK\r\LServer: nyx\r\LConnection: keep-alive\r\L\r\L")
 
 
+proc testUrlUnescape() =
+    check(UrlUnescape("%61%62%63") == "abc")
+    check(UrlUnescape("/some/path/%E6%B5%8B%E8%AF%95") == "/some/path/测试")
+    check(UrlUnescape("%E6%B5%8B%E8%AF%95/content") == "测试/content")
+    check(UrlUnescape("/some/path/%E6%B5%8B%E8%AF%95/content") == "/some/path/测试/content")
+    check(UrlUnescape("%%%%%%") == "%%%%%%")
+    check(UrlUnescape("") == "")
+
+
 proc doTests*() =
     testGetHeader()
     testWriteHeaders()
     testParseRequestLine()
     testParseHeader()
     testWriteHttpResp()
+    testUrlUnescape()
 
 
 when isMainModule:

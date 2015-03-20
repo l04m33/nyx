@@ -56,6 +56,25 @@ type
     HttpReq* = ref THttpReq
 
 
+proc UrlUnescape*(content: string): string =
+    var lasti = 0
+    var i = 0
+
+    result = ""
+
+    while i < content.len():
+        if content[i] == '%' and i + 2 <= content.len():
+            var hexStr = content[(i+1)..(i+2)]
+            if hexStr.allCharsInSet(HexDigits):
+                if i > lasti:
+                    result.add(content[lasti..(i-1)])
+                result.addf("$#", char(parseHexInt(hexStr)))
+                lasti = i + 3
+                i += 2
+        i += 1
+    result.add(content[lasti..i])
+
+
 proc parseRequestLine*(reqLine: string, req: var HttpReq) =
     var reqSeq = reqLine.split(' ')
 
@@ -65,9 +84,9 @@ proc parseRequestLine*(reqLine: string, req: var HttpReq) =
     req.meth = reqSeq[0]
 
     var pathAndQuery = reqSeq[1].split('?')
-    req.path = pathAndQuery[0]
+    req.path = UrlUnescape(pathAndQuery[0])
     if pathAndQuery.len() == 2:
-        req.query = pathAndQuery[1]
+        req.query = pathAndQuery[1]     # TODO: parse the parameters & unescape them?
 
     var protocolAndVersion = reqSeq[2].split('/')
     req.protocol = protocolAndVersion[0]
