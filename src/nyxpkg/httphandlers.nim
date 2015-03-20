@@ -25,6 +25,7 @@ proc handleHttpRequest(client: Client, req: HttpReq): Future[int] {.async.} =
     if status < 0:
         status = 500
         var resp = newHttpResp(500)
+        resp.headers.add((key: "Content-Length", value: "0"))
         await client.writer.write($resp)
         return 500
 

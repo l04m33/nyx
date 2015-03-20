@@ -18,7 +18,7 @@ type
     ClientHandler* = proc(c: Client): Future[Client]
 
     TClientOpenFile* = object of RootObj
-        client: Client
+        client*: Client
         afile: AsyncFile
 
     ClientOpenFile* = ref TClientOpenFile

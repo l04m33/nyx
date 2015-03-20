@@ -56,12 +56,13 @@ type
     HttpReq* = ref THttpReq
 
 
-proc parseRequestLine(reqLine: string, req: var HttpReq) =
+proc parseRequestLine*(reqLine: string, req: var HttpReq) =
     var reqSeq = reqLine.split(' ')
-    req.meth = reqSeq[0]
 
     if reqSeq.len() != 3:
         return
+
+    req.meth = reqSeq[0]
 
     var pathAndQuery = reqSeq[1].split('?')
     req.path = pathAndQuery[0]
@@ -82,12 +83,17 @@ proc parseRequestLine(reqLine: string, req: var HttpReq) =
     req.version = (major: pVersion[0].parseInt(), minor: minorVersion)
 
 
-proc parseHeader(headerLine: string, headers: var seq[HttpHeader]) =
+proc parseHeader*(headerLine: string, headers: var seq[HttpHeader]) =
     var firstCol = headerLine.find(':')
     if firstCol < 1:
         debug("bad header line: \"$#\"" % [headerLine])
         return
+
     var key = headerLine[0..(firstCol-1)].strip()
+    if key == "":
+        debug("bad header line: \"$#\"" % [headerLine])
+        return
+
     var value = headerLine[(firstCol+1)..(headerLine.len())].strip()
     headers.add((key: key, value: value))
 
@@ -104,12 +110,8 @@ proc newHttpReq*(r: Reader): Future[HttpReq] {.async.} =
     when not defined(nolog):
         debug("fd = $#, reqLine = \"$#\"" % [fd, reqLine])
 
-    if reqLine.len() > 0:
-        parseRequestLine(reqLine, result)
-        if isNil(result.meth) or isNil(result.path):
-            result.meth = nil
-            return
-    else:
+    parseRequestLine(reqLine, result)
+    if isNil(result.meth) or isNil(result.path):
         result.meth = nil
         return
 

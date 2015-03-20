@@ -55,6 +55,7 @@ proc doGet(c: Client, r: HttpReq): Future[int] {.async.} =
 
 proc doNotImplemented(c: Client, r: HttpReq): Future[int] {.async.} =
     var resp = newHttpResp(501)
+    resp.headers.add((key: "Content-Length", value: "0"))
     await c.writer.write($resp)
     return 501
 
