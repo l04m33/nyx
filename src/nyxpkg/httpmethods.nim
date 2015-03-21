@@ -23,7 +23,7 @@ proc normalizePath(path: string): string =
 
 
 proc doGet(c: Client, r: HttpReq): Future[int] {.async.} =
-    var path = normalizePath(r.path)
+    var path = normalizePath(UrlUnescape(r.path))
     var resp: HttpResp
 
     if existsFile(path):

@@ -84,7 +84,7 @@ proc parseRequestLine*(reqLine: string, req: var HttpReq) =
     req.meth = reqSeq[0]
 
     var pathAndQuery = reqSeq[1].split('?')
-    req.path = UrlUnescape(pathAndQuery[0])
+    req.path = pathAndQuery[0]
     if pathAndQuery.len() == 2:
         req.query = pathAndQuery[1]     # TODO: parse the parameters & unescape them?
 
