@@ -18,7 +18,7 @@ proc handleHttpRequest(client: Client, req: HttpReq): Future[int] {.async.} =
         status = await methodHandlers[req.meth.toUpper()](client, req)
     except:
         status = -1
-        client.closeOpenFiles()
+        client.closeResources()
         var msg = getCurrentExceptionMsg()
         debug("method handler failed, msg = $#" % [msg])
 

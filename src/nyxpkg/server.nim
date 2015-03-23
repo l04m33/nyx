@@ -38,7 +38,7 @@ proc purgeClient*(server: Server, clientId: int) =
     server.clients.del(clientId)
 
     debug("new client number: $#" % [$(server.clients.len())])
-    debug("closing cid = $#, openFiles.len() = $#" % [$clientId, $client.openFiles.len()])
+    debug("closing cid = $#, resources.len() = $#" % [$clientId, $client.resources.len()])
 
     client.close()
 
