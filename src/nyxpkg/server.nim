@@ -54,6 +54,8 @@ proc accept(server: Server): Future[AsyncSocket] {.async.} =
 
 
 proc serve*(server: Server, handler: ClientHandler) {.async.} =
+    # TODO: the `alive` flag here won't work when this proc is
+    #       suspended by server.accept()
     server.alive = true
     while server.alive:
         var clientSocket = await server.accept()
