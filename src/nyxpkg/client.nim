@@ -6,6 +6,10 @@ import
 
 
 type
+    NotImplementedError = object of Exception
+
+
+type
     TClient* = object of RootObj
         socket: AsyncSocket
         future*: Future[Client]
@@ -42,7 +46,7 @@ proc id*(c: Client): int =
 
 
 method close*(f: ClientResource, rm: bool = true) =
-    raise newException(Exception, "ClientResource.close() not implemented")
+    raise newException(NotImplementedError, "ClientResource.close() not implemented")
 
 
 proc closeResources*(c: Client) =
