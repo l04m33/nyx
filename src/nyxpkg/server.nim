@@ -12,8 +12,16 @@ type
     TServer = object of RootObj
         listener*: AsyncSocket
         clients*: TableRef[int, Client]
+        alive*: bool
 
     Server* = ref TServer
+
+
+proc newServer*(socket: AsyncSocket): Server =
+    new(result)
+    result.listener = socket
+    result.clients = newTable[int, Client]()
+    result.alive = false
 
 
 proc newServer*(address: string, port: uint16): Server =
@@ -26,9 +34,7 @@ proc newServer*(address: string, port: uint16): Server =
     serverSocket.bindAddr(port=Port(port), address=address)
     serverSocket.listen(backlog=SOMAXCONN)
 
-    new(result)
-    result.listener = serverSocket
-    result.clients = newTable[int, Client]()
+    result = newServer(serverSocket)
 
 
 proc purgeClient*(server: Server, clientId: int) =
@@ -48,7 +54,8 @@ proc accept(server: Server): Future[AsyncSocket] {.async.} =
 
 
 proc serve*(server: Server, handler: ClientHandler) {.async.} =
-    while true:
+    server.alive = true
+    while server.alive:
         var clientSocket = await server.accept()
 
         var client = newClient(clientSocket, handler)
