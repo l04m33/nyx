@@ -19,8 +19,15 @@ proc handleHttpRequest(client: Client, req: HttpReq): Future[int] {.async.} =
     except:
         status = -1
         client.closeResources()
+
         var msg = getCurrentExceptionMsg()
         debug("method handler failed, msg = $#" % [msg])
+
+        var
+            exc = getCurrentException()
+            trace = exc.getStackTrace()
+        if not isNil(trace) and trace != "":
+            debug(exc.getStackTrace())
 
     if status < 0:
         status = 500
