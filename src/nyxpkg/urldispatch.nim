@@ -5,7 +5,8 @@ import
     nyxpkg/client,
     nyxpkg/http,
     nyxpkg/mime,
-    nyxpkg/io
+    nyxpkg/io,
+    nyxpkg/logging
 
 
 type
@@ -14,7 +15,7 @@ type
 
 type
     TUrlResource* = object of RootObj
-        handler: proc(res: UrlResource, c: Client, r: HttpReq): Future[void]
+        handler*: proc(res: UrlResource, c: Client, r: HttpReq): Future[void]
 
     UrlResource* = ref TUrlResource
 
@@ -42,7 +43,9 @@ proc dispatch*(root: UrlResource, path: string): UrlResource =
 
     result = root
     for s in segs:
-        result = result[s]
+        if s.len() > 0:
+            debug("Dispatching to resource `$#`" % [s])
+            result = result[s]
 
 
 type
