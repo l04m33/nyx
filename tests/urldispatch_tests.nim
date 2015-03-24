@@ -1,6 +1,7 @@
 import
     asyncdispatch,
     os,
+    strutils,
     nyxpkg/urldispatch,
     nyxpkg/client,
     nyxpkg/http,
@@ -64,9 +65,61 @@ proc testStaticDispatch() =
     check(StaticUrlResource(res).path == "some/other/path")
 
 
+type
+    DynResource = ref object of TUrlResource
+
+
+proc dynResourceHandler(res: UrlResource, c: Client, req: HttpReq): Future[void] {.async.} =
+    discard
+
+
+proc dynamicRootFactory(): UrlResource =
+    var root: DynResource
+    new(root)
+    root.handler = dynResourceHandler
+
+    return root
+
+
+method `[]`(res: DynResource, subRes: string): UrlResource =
+    case subRes
+        of "hello":
+            return res
+        of "static":
+            return newStaticRoot(".")
+        else:
+            raise newException(PathNotFoundError, "$#" % [subRes])
+
+
+proc testDynamicDispatch() =
+    var res = dynamicRootFactory()
+    check(res.dispatch("") == res)
+    check(res.dispatch("/") == res)
+    check(res.dispatch("/hello") == res)
+
+    var excFlag = false
+    try:
+        discard res.dispatch("/does/not/exist")
+    except PathNotFoundError:
+        excFlag = true
+
+    check(excFlag == true)
+
+    var sRes = res.dispatch("/static")
+    check(StaticUrlResource(sRes).root == ".")
+    check(StaticUrlResource(sRes).path == "")
+
+    sRes = res.dispatch("/static/")
+    check(StaticUrlResource(sRes).path == "")
+
+    sRes = res.dispatch("/static/some/path")
+    check(StaticUrlResource(sRes).path == "some/path")
+
+
 proc doTests*() =
     testDefaultDispatch()
     testStaticDispatch()
+    testDynamicDispatch()
 
 
 when isMainModule:
