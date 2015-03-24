@@ -1,23 +1,37 @@
 import
     asyncdispatch,
     strutils,
-    tables,
     nyxpkg/client,
     nyxpkg/http,
-    nyxpkg/httpmethods,
+    nyxpkg/urldispatch,
     nyxpkg/io,
     nyxpkg/logging
 
 
-proc handleHttpRequest(client: Client, req: HttpReq): Future[int] {.async.} =
+proc handleHttpRequest(client: Client, req: HttpReq, rootFactory: (proc(): UrlResource)): Future[void] {.async.} =
     when not defined(nolog):
         var cid = client.id()
 
-    var status: int
+    var dstRes: UrlResource = nil
     try:
-        status = await methodHandlers[req.meth.toUpper()](client, req)
+        var res = rootFactory()
+        dstRes = res.dispatch(req.path)
+    except PathNotFoundError:
+        discard
+
+    if isNil(dstRes):
+        when not defined(nolog):
+            debug("cid = $#, status = $#" % [$cid, $404])
+
+        var resp = newHttpResp(404)
+        resp.headers.add((key: "Content-Length", value: "0"))
+        await client.writer.write($resp)
+        return
+
+    var excFlag = false
+    try:
+        await dstRes.handle(client, req)
     except:
-        status = -1
         client.closeResources()
 
         var msg = getCurrentExceptionMsg()
@@ -29,25 +43,23 @@ proc handleHttpRequest(client: Client, req: HttpReq): Future[int] {.async.} =
         if not isNil(trace) and trace != "":
             debug(exc.getStackTrace())
 
-    if status < 0:
-        status = 500
+        excFlag = true
+
+    if excFlag:
+        when not defined(nolog):
+            debug("cid = $#, status = $#" % [$cid, $500])
+
         var resp = newHttpResp(500)
         resp.headers.add((key: "Content-Length", value: "0"))
         await client.writer.write($resp)
-        return 500
-
-    when not defined(nolog):
-        debug("cid = $#, status = $#" % [$cid, $status])
-
-    return status
 
 
-proc handleHttpClient*(client: Client): Future[Client] {.async, procvar.} =
+proc handleHttpClient*(client: Client, rootFactory: (proc(): UrlResource)): Future[Client] {.async, procvar.} =
     while not client.isClosed():
         var req = await newHttpReq(client.reader)
 
         if not isNil(req.meth):
-            discard (await handleHttpRequest(client, req))
+            await handleHttpRequest(client, req, rootFactory)
 
             var connVal = req.getFirstHeader("Connection")
             if isNil(connVal) or connVal.toUpper() == "KEEP-ALIVE":
