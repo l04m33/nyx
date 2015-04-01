@@ -109,6 +109,15 @@ proc testUrlUnescape() =
     check(UrlUnescape("") == "")
 
 
+proc testUrlEscape() =
+    check(UrlEscape("XYZabc.123~") == "XYZabc.123~")
+    check(UrlEscape( "some测试") == "some%E6%B5%8B%E8%AF%95")
+    check(UrlEscape("测试/content") == "%E6%B5%8B%E8%AF%95%2Fcontent")
+    check(UrlEscape("some/测试/content") == "some%2F%E6%B5%8B%E8%AF%95%2Fcontent")
+    check(UrlEscape("%%%%%%") == "%25%25%25%25%25%25")
+    check(UrlEscape("") == "")
+
+
 proc doTests*() =
     testGetHeader()
     testWriteHeaders()
@@ -117,6 +126,7 @@ proc doTests*() =
     testParseQuery()
     testWriteHttpResp()
     testUrlUnescape()
+    testUrlEscape()
 
 
 when isMainModule:

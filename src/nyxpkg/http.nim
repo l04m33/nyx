@@ -70,6 +70,30 @@ type
     HttpReq* = ref THttpReq
 
 
+proc UrlEscape*(content: string): string =
+    const unreserved = {
+        'A'..'Z',
+        'a'..'z',
+        '0'..'9',
+        '-',
+        '_',
+        '.',
+        '~'
+    }
+
+    result = ""
+    var i = 0
+    var lasti = 0
+    while i < content.len():
+        if content[i] notin unreserved:
+            if i > lasti:
+                result.add(content[lasti..(i-1)])
+            result.add("%" & toHex(ord(content[i]), 2))
+            lasti = i + 1
+        i += 1
+    result.add(content[lasti..(i-1)])
+
+
 proc UrlUnescape*(content: string): string =
     var lasti = 0
     var i = 0
@@ -86,7 +110,7 @@ proc UrlUnescape*(content: string): string =
                 lasti = i + 3
                 i += 2
         i += 1
-    result.add(content[lasti..i])
+    result.add(content[lasti..(i-1)])
 
 
 proc parseRequestLine*(reqLine: string, req: var HttpReq) =
@@ -211,6 +235,8 @@ proc getStatusCode*(status: int): string =
     case status
         of 200:
             return "OK"
+        of 303:
+            return "See Other"
         of 400:
             return "Bad Request"
         of 404:

@@ -19,7 +19,7 @@
             #for id, ent in pairs(shelf):
             <li>
                 <a href="/recv?e=$id">
-                    <span>$id</span> : <span>$ent.name</span>
+                    <span>$id</span> / <span>$ent.name</span>
                     #if not isNil(ent.tag) and ent.tag.len() > 0:
                     - <span>$ent.tag</span>
                     #end if

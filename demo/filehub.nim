@@ -14,6 +14,8 @@ import
 type
     TDynResource = object of TUrlResource
         op: string
+        recvId: int
+        recvName: string
 
     DynResource = ref TDynResource
 
@@ -54,6 +56,14 @@ proc waitForTransfer(c: Client, t: TransEntry): Future[void] {.async.} =
 proc showErrorPage(code: int, c: Client): Future[void] {.async.} =
     var resp = newHttpResp(code)
     var pageContent = pageError(code)
+    resp.headers.add((key: "Content-Length", value: $(pageContent.len())))
+    resp.headers.add((key: "Content-Type", value: "text/html"))
+    await c.writer.write($resp)
+    await c.writer.write(pageContent)
+
+
+proc showErrorPage(resp: HttpResp, c: Client): Future[void] {.async.} =
+    var pageContent = pageError(resp.status)
     resp.headers.add((key: "Content-Length", value: $(pageContent.len())))
     resp.headers.add((key: "Content-Type", value: "text/html"))
     await c.writer.write($resp)
@@ -101,6 +111,10 @@ proc parseFileInfo(partHeaders: seq[HttpHeader], reader: Reader): TransEntry =
             fieldName = sd[5..(sd.len()-1)]
         elif sd.startsWith("filename="):
             fileName = sd[9..(sd.len()-1)]
+            if fileName.len() >= 2 and fileName[0] == '"' and fileName[fileName.len() - 1] == '"':
+                fileName = fileName[1..(fileName.len() - 2)]
+                if fileName.len() <= 0:
+                    fileName = "Anonymous File"
 
     if isNil(fieldName) or fieldName != "\"userfile\"":
         return nil
@@ -228,6 +242,23 @@ proc dynResourceHandler(res: UrlResource, c: Client, req: HttpReq): Future[void]
                 await showErrorPage(404, c)
                 return
 
+            resp = newHttpResp(303)
+            resp.headers.add((key: "Location", value: "r/$#/$#" % [$entryIdx, UrlEscape(shelf[entryIdx].name)]))
+            await showErrorPage(resp, c)
+
+        of "/r":
+            if req.meth != "GET":
+                await showErrorPage(400, c)
+                return
+
+            var entryIdx = d.recvId
+
+            debug("recv: entryIdx = $#" % [$entryIdx])
+
+            if not shelf.hasKey(entryIdx):
+                await showErrorPage(404, c)
+                return
+
             resp = newHttpResp(200)
 
             var transfer = shelf[entryIdx]
@@ -254,6 +285,8 @@ proc dynamicRootFactory(): UrlResource =
     new(root)
     root.handler = dynResourceHandler
     root.op = "/"
+    root.recvId = -1
+    root.recvName = nil
     return root
 
 
@@ -266,8 +299,25 @@ method `[]`(res: DynResource, subRes: string): UrlResource =
             of "recv":
                 res.op = "/recv"
                 return res
+            of "r":
+                res.op = "/r"
+                return res
             else:
                 raise newException(PathNotFoundError, "$#" % [subRes])
+
+    elif res.op == "/r":
+        if res.recvId < 0:
+            try:
+                res.recvId = parseInt(subRes)
+            except ValueError:
+                raise newException(PathNotFoundError, "$#" % [subRes])
+        elif isNil(res.recvName):
+            res.recvName = UrlUnescape(subRes)
+        else:
+            raise newException(PathNotFoundError, "$#" % [subRes])
+
+        return res
+
     else:
         raise newException(PathNotFoundError, "$#" % [subRes])
 
