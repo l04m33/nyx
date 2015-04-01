@@ -81,6 +81,14 @@ proc testParseHeader() =
     check(headers == @[])
 
 
+proc testParseQuery() =
+    check(parseQuery("a=1") == @[(key: "a", value: "1")])
+    check(parseQuery("a=1&b=2") == @[(key: "a", value: "1"), (key: "b", value: "2")])
+    check(parseQuery("a&b=2") == @[(key: "a", value: ""), (key: "b", value: "2")])
+    check(parseQuery("=1&b=2") == @[(key: "b", value: "2")])
+    check(parseQuery("b=%E6%B5%8B%E8%AF%95&a=1") == @[(key: "b", value: "测试"), (key: "a", value: "1")])
+
+
 proc testWriteHttpResp() =
     var resp = newHttpResp(200)
     resp.headers = @[
@@ -106,6 +114,7 @@ proc doTests*() =
     testWriteHeaders()
     testParseRequestLine()
     testParseHeader()
+    testParseQuery()
     testWriteHttpResp()
     testUrlUnescape()
 

@@ -9,7 +9,11 @@ import
 
 
 type
-    HttpHeader* = tuple[key: string, value: string]
+    StrKeyValue* = tuple[key: string, value: string]
+
+    HttpHeader* = StrKeyValue
+
+    QueryParam* = StrKeyValue
 
     HttpVersion* = tuple[major: int, minor: int]
 
@@ -21,21 +25,31 @@ type
     HttpBase* = ref THttpBase
 
 
-method getHeader*(r: HttpBase, key: string): seq[string] =
+proc getValue*(l: seq[StrKeyValue], key: string): seq[string] =
     result = @[]
+    let upperKey = key.toUpper()
+    for i in items(l):
+        if i.key.toUpper() == upperKey:
+            result.add(i.value)
+
+
+proc getFirstValue*(l: seq[StrKeyValue], key: string): string =
+    let upperKey = key.toUpper()
+    for i in items(l):
+        if i.key.toUpper() == upperKey:
+            return i.value
+    return nil
+
+
+method getHeader*(r: HttpBase, key: string): seq[string] =
     if not isNil(r.headers):
-        let upperKey = key.toUpper()
-        for h in items(r.headers):
-            if h.key.toUpper() == upperKey:
-                result.add(h.value)
+        return r.headers.getValue(key)
+    return @[]
 
 
 method getFirstHeader*(r: HttpBase, key: string): string =
     if not isNil(r.headers):
-        let upperKey = key.toUpper()
-        for h in items(r.headers):
-            if h.key.toUpper() == upperKey:
-                return h.value
+        return r.headers.getFirstValue(key)
     return nil
 
 
@@ -81,7 +95,7 @@ proc parseRequestLine*(reqLine: string, req: var HttpReq) =
     if reqSeq.len() != 3:
         return
 
-    req.meth = reqSeq[0]
+    req.meth = reqSeq[0].toUpper()
 
     var pathAndQuery = reqSeq[1].split('?')
     req.path = pathAndQuery[0]
@@ -115,6 +129,33 @@ proc parseHeader*(headerLine: string, headers: var seq[HttpHeader]) =
 
     var value = headerLine[(firstCol+1)..(headerLine.len())].strip()
     headers.add((key: key, value: value))
+
+
+proc parseQuery*(queryStr: string): seq[QueryParam] =
+    var paramStrs = queryStr.split('&')
+
+    result = @[]
+
+    for p in paramStrs:
+        var sp = p.strip()
+        if sp.len() == 0:
+            continue
+
+        var firstEq = sp.find('=')
+        if firstEq > 0:
+            var key = UrlUnescape(sp[0..(firstEq-1)].strip())
+            if key == "":
+                debug("bad query param: \"$#\"" % [sp])
+                continue
+
+            var value = UrlUnescape(sp[(firstEq+1)..(sp.len())].strip())
+            result.add((key: key, value: value))
+        elif firstEq < 0:
+            var key = UrlUnescape(sp)
+            result.add((key: key, value: ""))
+        else:
+            debug("bad query param: \"$#\"" % [sp])
+            continue
 
 
 proc newHttpReq*(r: Reader): Future[HttpReq] {.async.} =
