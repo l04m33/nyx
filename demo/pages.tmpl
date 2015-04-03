@@ -7,26 +7,171 @@
         <title>FileHub</title>
 
         <style>
+            body, div, span, ul, li, form, input, label, a {
+                margin: 0px;
+                padding: 0px;
+            }
+
+            .progress-container {
+                position: relative;
+                background-color: #eeeeee;
+                height: 18px;
+            }
+
+            .progress-bar {
+                z-index: 1;
+                position: fixed;
+                width: 0px;
+                height: 18px;
+                background-color: #ccccff;
+            }
+
+            .progress-message {
+                z-index: 2;
+                position: fixed;
+                width: 100%;
+                text-align: center;
+                font-size: 14px;
+            }
         </style>
+
     </head>
 
     <body>
-        <form enctype="multipart/form-data" action="/send" method="POST">
-            Send this file: <input name="userfile" type="file" />
-            <input type="submit" value="Send File" />
-        </form>
-        <ul>
-            #for id, ent in pairs(shelf):
-            <li>
-                <a href="/recv?e=$id">
-                    <span>$id</span> / <span>$ent.name</span>
-                    #if not isNil(ent.tag) and ent.tag.len() > 0:
-                    - <span>$ent.tag</span>
-                    #end if
-                </a>
-            </li>
-            #end for
-        </ul>
+        <div>
+            <div>
+                <form enctype="multipart/form-data" method="POST" name="upload">
+                    Send this file: <input name="userfile" type="file" />
+                    <input type="submit" value="Send File" />
+                </form>
+                <div class="progress-container">
+                    <div id="upload-progress" class="progress-bar">
+                    </div>
+                    <div id="upload-message" class="progress-message">
+                        <span id="message-content">Ready</span> <span id="animated-text"></span>
+                    </div>
+                </div>
+            </div>
+            <div>
+                <ul>
+                    #for id, ent in pairs(shelf):
+                    <li>
+                        <a href="/recv?e=$id" target="_blank">
+                            <span>$id</span> / <span>$ent.name</span>
+                            #if not isNil(ent.tag) and ent.tag.len() > 0:
+                            - <span>$ent.tag</span>
+                            #end if
+                        </a>
+                    </li>
+                    #end for
+                </ul>
+            </div>
+        </div>
+
+        <script>
+            (function() {
+                function enableInputs(formName, enabled) {
+                    var form = document.forms.namedItem(formName),
+                        inputList = form.children;
+
+                    for (var i = 0; i < inputList.length; i++) {
+                        if (inputList[i].nodeType === document.ELEMENT_NODE &&
+                                inputList[i].nodeName === "INPUT") {
+                            inputList[i].disabled = !enabled
+                        }
+                    }
+                }
+
+                function showMsg(msg) {
+                    var pMsg = document.getElementById("message-content"),
+                        aText = document.getElementById("animated-text");
+
+                    pMsg.innerHTML = msg;
+                    aText.innerHTML = "";
+                }
+
+                function updateProgress(progress, isPercent) {
+                    var pBar = document.getElementById("upload-progress"),
+                        pMsg = document.getElementById("message-content"),
+                        aText = document.getElementById("animated-text");
+
+                    if (isPercent === true) {
+                        pBar.style.width = progress + "%";
+                        pMsg.innerHTML = progress + "% Uploaded"
+                    } else {
+                        pBar.style.width = "100%";
+                        pMsg.innerHTML = progress + " Bytes Uploaded"
+                    }
+
+                    if (isPercent === true && progress >= 100) {
+                        aText.innerHTML = "";
+                    } else {
+                        switch (aText.innerHTML) {
+                            case "":
+                                aText.innerHTML = ".";
+                                break;
+                            case ".":
+                                aText.innerHTML = "..";
+                                break;
+                            case "..":
+                                aText.innerHTML = "...";
+                                break;
+                            case "...":
+                                aText.innerHTML = ".";
+                                break;
+                            default:
+                                aText.innerHTML = "";
+                        }
+                    }
+                }
+
+                function doUpload(form) {
+                    var formData = new FormData(form),
+                        request = new XMLHttpRequest();
+
+                    request.upload.addEventListener("progress", function(ev) {
+                        if (ev.lengthComputable) {
+                            var percentComplete = Math.min(ev.loaded / ev.total * 100, 100).toFixed(2);
+                            updateProgress(percentComplete, true)
+                        } else {
+                            updateProgress(ev.loaded, false)
+                        }
+                    }, false);
+
+                    request.upload.addEventListener("error", function(ev) {
+                        console.log(ev);
+                        showMsg("An error occured. Status: " + request.statusText);
+                        enableInputs("upload", true);
+                    }, false);
+
+                    request.upload.addEventListener("abort", function(ev) {
+                        console.log(ev);
+                        showMsg("The transfer has been canceled.");
+                        enableInputs("upload", true);
+                    }, false);
+
+                    request.addEventListener("load", function(ev) {
+                        if (request.responseText != "Done.") {
+                            showMsg("An error occured. Status: " + request.statusText + "; Response: " + request.responseText);
+                        } else {
+                            showMsg(request.responseText);
+                        }
+                        enableInputs("upload", true);
+                    }, false);
+
+                    request.open("POST", "send");
+                    request.send(formData);
+                }
+
+                var uploadForm = document.forms.namedItem("upload");
+                uploadForm.addEventListener('submit', function(ev) {
+                    updateProgress(0, true);
+                    doUpload(ev.target);
+                    enableInputs("upload", false);
+                    ev.preventDefault();
+                }, false);
+            })();
+        </script>
     </body>
 </html>
 #end proc
