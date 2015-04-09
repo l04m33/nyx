@@ -7,49 +7,100 @@
         <title>FileHub</title>
 
         <style>
-            body, div, span, ul, li, form, input, label, a {
-                margin: 0px;
-                padding: 0px;
+            body, div, span, ul, li, form, input, label, a { margin: 0px; padding: 0px; }
+            .hidden { display: none; }
+            .main-container { min-width: 300px; max-width: 960px; margin: 0px auto; }
+            .upload-ui { margin: 0px 10px; }
+            .progress-list {
+                margin-top: 10px;
+                padding: 5px 0px;
+                background-color: #fafafa;
+                border-radius: 5px;
             }
-
-            .progress-container {
-                position: relative;
-                background-color: #eeeeee;
-                height: 18px;
-            }
-
+            .progress-container { position: relative; }
             .progress-bar {
                 z-index: 1;
-                position: fixed;
+                position: absolute;
                 width: 0px;
-                height: 18px;
-                background-color: #ccccff;
+                height: 44px;
+                background-color: #ccf;
+                opacity: 0.5;
+                border-bottom: 1px solid #ccc;
+                border-right: 1px solid #ccc;
             }
-
-            .progress-message {
+            .progress-file-name {
                 z-index: 2;
-                position: fixed;
-                width: 100%;
-                text-align: center;
-                font-size: 14px;
+                position: relative;
+                width: auto;
+                height: 14px;
+                padding: 2px 10px;
+                font-size: 12px;
+                color: #777;
             }
+            .progress-message {
+                z-index: 3;
+                position: relative;
+                width: auto;
+                height: 18px;
+                padding: 4px 10px;
+                text-align: center;
+                font-size: 16px;
+                color: #87d;
+            }
+            .file-list {
+                cursor: pointer;
+                background-color: #fafafa;
+                list-style-type: none;
+                padding: 5px 0px;
+                margin-top: 10px;
+                border-radius: 5px;
+                color: #777;
+            }
+            .list-item { background: none; }
+            .list-item:nth-child(2n+1) { background-color: #fff; }
+            .file-list li { padding: 2px 10px; }
+            .button {
+                cursor: pointer;
+                background-color: #f4f7ff;
+                color: #777;
+                text-align: center;
+                padding: 20px 0px;
+                margin: 10px auto 0px auto;
+                border-radius: 5px;
+                box-shadow: 0px 1px 1px #aaa;
+                font-size: 20px;
+                font-family: sans-serif;
+                max-width: 240px;
+            }
+            .button:hover { box-shadow: 0px 2px 2px #aaa; }
+            .button:active { box-shadow: 0px 1px 1px #aaa; }
         </style>
 
     </head>
 
     <body>
-        <div>
-            <div>
-                <form enctype="multipart/form-data" method="POST" name="upload">
-                    Send this file: <input name="userfile" type="file" />
-                    <input type="submit" value="Send File" />
+        <div class="main-container">
+            <div class="upload-ui">
+                <form id="upload-form" name="upload" class="hidden" method="POST" enctype="multipart/form-data">
+                    <input name="userfile" type="file" multiple required />
                 </form>
-                <div class="progress-container">
-                    <div id="upload-progress" class="progress-bar">
+                <ul id="file-list" class="file-list">
+                    <li>No files selected.</li>
+                </ul>
+
+                <div id="submit-button" class="button">Send Files</div>
+                <div id="select-button" class="button">Select Files</div>
+
+                <div id="progress-list" class="progress-list">
+                    <!--
+                    <div class="progress-container">
+                        <div class="progress-bar">
+                        </div>
+                        <div class="progress-message">
+                            <span>Ready</span>
+                        </div>
                     </div>
-                    <div id="upload-message" class="progress-message">
-                        <span id="message-content">Ready</span> <span id="animated-text"></span>
-                    </div>
+                    -->
                 </div>
             </div>
             <div>
@@ -70,104 +121,149 @@
 
         <script>
             (function() {
-                function enableInputs(formName, enabled) {
-                    var form = document.forms.namedItem(formName),
-                        inputList = form.children;
+                function Transfer(f) {
+                    this.domElement = document.createElement('div');
+                    this.domElement.classList.add("progress-container");
+                    this.domElement.classList.add("list-item");
 
-                    for (var i = 0; i < inputList.length; i++) {
-                        if (inputList[i].nodeType === document.ELEMENT_NODE &&
-                                inputList[i].nodeName === "INPUT") {
-                            inputList[i].disabled = !enabled
-                        }
+                    var progressBar = document.createElement('div');
+                    progressBar.classList.add("progress-bar");
+                    this.domElement.appendChild(progressBar);
+
+                    var progressFileName = document.createElement('div');
+                    progressFileName.classList.add("progress-file-name");
+                    progressFileName.textContent = f.name;
+                    this.domElement.appendChild(progressFileName);
+
+                    var progressMsg = document.createElement('div');
+                    progressMsg.classList.add("progress-message");
+
+                    var messageContent = document.createElement('span');
+                    messageContent.textContent = "Ready";
+                    progressMsg.appendChild(messageContent);
+
+                    this.domElement.appendChild(progressMsg);
+
+                    this.progressBar = progressBar;
+                    this.messageContent = messageContent;
+
+                    this.file = f;
+
+                    var thiz = this;
+
+                    this.updateProgress = function (percent) {
+                        this.progressBar.style.width = percent + "%";
+                        this.messageContent.textContent = percent + "%"
                     }
-                }
 
-                function showMsg(msg) {
-                    var pMsg = document.getElementById("message-content"),
-                        aText = document.getElementById("animated-text");
+                    this.doUpload = function () {
+                        var formData = new FormData(),
+                            request = new XMLHttpRequest();
 
-                    pMsg.innerHTML = msg;
-                    aText.innerHTML = "";
-                }
+                        formData.append("userfile", this.file, this.file.name);
 
-                function updateProgress(progress, isPercent) {
-                    var pBar = document.getElementById("upload-progress"),
-                        pMsg = document.getElementById("message-content"),
-                        aText = document.getElementById("animated-text");
-
-                    if (isPercent === true) {
-                        pBar.style.width = progress + "%";
-                        pMsg.innerHTML = progress + "% Uploaded"
-                    } else {
-                        pBar.style.width = "100%";
-                        pMsg.innerHTML = progress + " Bytes Uploaded"
-                    }
-
-                    if (isPercent === true && progress >= 100) {
-                        aText.innerHTML = "";
-                    } else {
-                        switch (aText.innerHTML) {
-                            case "":
-                                aText.innerHTML = ".";
-                                break;
-                            case ".":
-                                aText.innerHTML = "..";
-                                break;
-                            case "..":
-                                aText.innerHTML = "...";
-                                break;
-                            case "...":
-                                aText.innerHTML = ".";
-                                break;
-                            default:
-                                aText.innerHTML = "";
-                        }
-                    }
-                }
-
-                function doUpload(form) {
-                    var formData = new FormData(form),
-                        request = new XMLHttpRequest();
-
-                    request.upload.addEventListener("progress", function(ev) {
-                        if (ev.lengthComputable) {
+                        request.upload.addEventListener("progress", function(ev) {
                             var percentComplete = Math.min(ev.loaded / ev.total * 100, 100).toFixed(2);
-                            updateProgress(percentComplete, true)
-                        } else {
-                            updateProgress(ev.loaded, false)
-                        }
-                    }, false);
+                            thiz.updateProgress(percentComplete, true)
+                        }, false);
 
-                    request.upload.addEventListener("error", function(ev) {
-                        console.log(ev);
-                        showMsg("An error occured. Status: " + request.statusText);
-                        enableInputs("upload", true);
-                    }, false);
+                        request.upload.addEventListener("error", function(ev) {
+                            console.log(ev);
+                            thiz.showMsg("An error occured. Status: " + request.statusText);
+                        }, false);
 
-                    request.upload.addEventListener("abort", function(ev) {
-                        console.log(ev);
-                        showMsg("The transfer has been canceled.");
-                        enableInputs("upload", true);
-                    }, false);
+                        request.upload.addEventListener("abort", function(ev) {
+                            console.log(ev);
+                            thiz.showMsg("The transfer has been canceled.");
+                        }, false);
 
-                    request.addEventListener("load", function(ev) {
-                        if (request.responseText != "Done.") {
-                            showMsg("An error occured. Status: " + request.statusText + "; Response: " + request.responseText);
-                        } else {
-                            showMsg(request.responseText);
-                        }
-                        enableInputs("upload", true);
-                    }, false);
+                        request.addEventListener("load", function(ev) {
+                            if (request.responseText != "Done.") {
+                                thiz.showMsg("An error occured. Status: " + request.statusText + "; Response: " + request.responseText);
+                            } else {
+                                thiz.showMsg(request.responseText);
+                            }
+                        }, false);
 
-                    request.open("POST", "send");
-                    request.send(formData);
+                        request.open("POST", "send");
+                        request.send(formData);
+                    }
+
+                    this.showMsg = function (msg) {
+                        this.messageContent.textContent = msg;
+                    }
+
+                    return this;
                 }
 
-                var uploadForm = document.forms.namedItem("upload");
-                uploadForm.addEventListener('submit', function(ev) {
-                    updateProgress(0, true);
-                    doUpload(ev.target);
-                    enableInputs("upload", false);
+                var uploadForm = document.forms.namedItem("upload"),
+                    fileInput = uploadForm.children[0],
+                    submitButton = document.getElementById("submit-button"),
+                    selectButton = document.getElementById("select-button");
+
+                submitButton.addEventListener("click", function(ev) {
+                    var files = fileInput.files,
+                        transfers = new Array(files.length),
+                        pList = document.getElementById("progress-list");
+
+                    var dummyEv = new CustomEvent("change", {"detail": {"filesOverride": []}});
+                    fileInput.dispatchEvent(dummyEv);
+
+                    pList.innerHTML;
+                    for (var i = 0; i < files.length; i++) {
+                        transfers[i] = new Transfer(files[i]);
+                        pList.appendChild(transfers[i].domElement);
+                        transfers[i].updateProgress(0);
+                        transfers[i].doUpload();
+                    }
+
+                    ev.preventDefault();
+                }, false);
+
+                var fileList = document.getElementById("file-list");
+
+                fileInput.addEventListener("change", function(ev) {
+                    var files;
+
+                    if (ev.detail && ev.detail.filesOverride) {
+                        files = ev.detail.filesOverride;
+                    } else {
+                        files = ev.target.files
+                    }
+
+                    if (files && files.length > 0) {
+                        fileList.innerHTML = "";
+
+                        for (var i = 0; i < ev.target.files.length; i++) {
+                            var fileLine = document.createElement("li");
+                            fileLine.textContent = ev.target.files[i].name;
+                            fileLine.classList.add("list-item");
+                            fileList.appendChild(fileLine);
+                        }
+
+                        submitButton.classList.remove("hidden");
+                        selectButton.classList.add("hidden");
+                    } else {
+                        fileList.innerHTML = "";
+                        var fileLine = document.createElement("li");
+                        fileLine.textContent = "No files selected.";
+                        fileList.appendChild(fileLine);
+
+                        submitButton.classList.add("hidden");
+                        selectButton.classList.remove("hidden");
+                    }
+                }, false);
+
+                var dummyEv = new Event("change");
+                fileInput.dispatchEvent(dummyEv);
+
+                selectButton.addEventListener("click", function (ev) {
+                    fileInput.click();
+                    ev.preventDefault();
+                }, false);
+
+                fileList.addEventListener("click", function (ev) {
+                    fileInput.click();
                     ev.preventDefault();
                 }, false);
             })();
