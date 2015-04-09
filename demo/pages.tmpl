@@ -47,6 +47,24 @@
                 font-size: 16px;
                 color: #87d;
             }
+            .transfer-op-bar {
+                display: none;
+                position: absolute;
+                z-index: 14;
+                top: 2px;
+                right: 0px;
+            }
+            .transfer-op-btn {
+                padding: 0px 4px;
+                font-size: 12px;
+                font-family: sans-serif;
+                font-weight: bold;
+                cursor: pointer;
+                opacity: 0.5;
+            }
+            .transfer-op-btn:hover { opacity: 1.0; }
+            .transfer-op-btn:active { opacity: 0.5; }
+            .transfer-op-close { color: #f99; }
             .file-list {
                 cursor: pointer;
                 background-color: #fafafa;
@@ -70,7 +88,6 @@
                 box-shadow: 0px 1px 1px #aaa;
                 font-size: 20px;
                 font-family: sans-serif;
-                max-width: 240px;
             }
             .button:hover { box-shadow: 0px 2px 2px #aaa; }
             .button:active { box-shadow: 0px 1px 1px #aaa; }
@@ -117,14 +134,14 @@
                 <form id="upload-form" name="upload" class="hidden" method="POST" enctype="multipart/form-data">
                     <input name="userfile" type="file" multiple required />
                 </form>
-                <ul id="file-list" class="file-list">
+                <ul id="file-list" class="file-list" title="Files To Send">
                     <li>No files selected.</li>
                 </ul>
 
                 <div id="submit-button" class="button">Send Files</div>
                 <div id="select-button" class="button">Select Files</div>
 
-                <div id="progress-list" class="progress-list">
+                <div id="progress-list" class="progress-list" title="Transfers">
                     <!--
                     <div class="progress-container">
                         <div class="progress-bar">
@@ -137,7 +154,7 @@
                 </div>
             </div>
             <div class="download-ui">
-                <ul id="remote-file-list" class="remote-file-list">
+                <ul id="remote-file-list" class="remote-file-list" title="Remote Files">
                     #for id, ent in pairs(shelf):
                     <li class="list-item">
                         <a href="/recv?e=$id" target="_blank">
@@ -177,6 +194,24 @@
                     progressMsg.appendChild(messageContent);
 
                     this.domElement.appendChild(progressMsg);
+
+                    var opBtns = document.createElement('div');
+                    opBtns.classList.add("transfer-op-bar");
+
+                    var closeBtn = document.createElement('span');
+                    closeBtn.classList.add("transfer-op-btn");
+                    closeBtn.classList.add("transfer-op-close");
+                    closeBtn.textContent = "X";
+                    opBtns.appendChild(closeBtn);
+
+                    this.domElement.appendChild(opBtns);
+
+                    this.domElement.addEventListener("mouseover", function (ev) {
+                        opBtns.style.display = "block";
+                    }, false);
+                    this.domElement.addEventListener("mouseleave", function (ev) {
+                        opBtns.style.display = "none";
+                    }, false);
 
                     this.progressBar = progressBar;
                     this.messageContent = messageContent;
@@ -221,6 +256,8 @@
 
                         request.open("POST", "send");
                         request.send(formData);
+
+                        this.request = request
                     }
 
                     this.showMsg = function (msg) {
