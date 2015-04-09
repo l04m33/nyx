@@ -125,15 +125,6 @@ proc parseFileInfo(partHeaders: seq[HttpHeader], reader: Reader): TransEntry =
     return newTransEntry(fileName, ct, nil, reader)
 
 
-proc calcContentLength(data: string, oldLen: int): int =
-    if data.len() == 0:
-        return oldLen
-    elif data == "\r\L":
-        return oldLen - 2
-    else:
-        return oldLen - data.len() - 2
-
-
 proc dynResourceHandler(res: UrlResource, c: Client, req: HttpReq): Future[void] {.async.} =
     var d = DynResource(res)
 

@@ -25,17 +25,17 @@ type
     HttpBase* = ref THttpBase
 
 
-proc getValue*(l: seq[StrKeyValue], key: string): seq[string] =
+proc getValue*(kvList: seq[StrKeyValue], key: string): seq[string] =
     result = @[]
     let upperKey = key.toUpper()
-    for i in items(l):
+    for i in items(kvList):
         if i.key.toUpper() == upperKey:
             result.add(i.value)
 
 
-proc getFirstValue*(l: seq[StrKeyValue], key: string): string =
+proc getFirstValue*(kvList: seq[StrKeyValue], key: string): string =
     let upperKey = key.toUpper()
-    for i in items(l):
+    for i in items(kvList):
         if i.key.toUpper() == upperKey:
             return i.value
     return nil
