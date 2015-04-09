@@ -173,6 +173,8 @@
         <script>
             (function() {
                 function Transfer(f) {
+                    var thiz = this;
+
                     this.domElement = document.createElement('div');
                     this.domElement.classList.add("progress-container");
                     this.domElement.classList.add("list-item");
@@ -202,6 +204,17 @@
                     closeBtn.classList.add("transfer-op-btn");
                     closeBtn.classList.add("transfer-op-close");
                     closeBtn.textContent = "X";
+                    closeBtn.addEventListener("click", function (ev) {
+                        var confirmed = true;
+                        if (thiz.request.readyState < XMLHttpRequest.DONE) {
+                            confirmed = confirm("Transfer not completed yet. You sure?");
+                        }
+
+                        if (confirmed) {
+                            thiz.abort();
+                            thiz.domElement.remove();
+                        }
+                    }, false);
                     opBtns.appendChild(closeBtn);
 
                     this.domElement.appendChild(opBtns);
@@ -217,8 +230,6 @@
                     this.messageContent = messageContent;
 
                     this.file = f;
-
-                    var thiz = this;
 
                     this.updateProgress = function (percent) {
                         this.progressBar.style.width = percent + "%";
@@ -241,10 +252,18 @@
                             thiz.showMsg("An error occured. Status: " + request.statusText);
                         }, false);
 
-                        request.upload.addEventListener("abort", function(ev) {
+                        //request.upload.addEventListener("abort", function(ev) {
+                        //    thiz.showMsg("The transfer has been canceled.");
+                        //}, false);
+
+                        request.addEventListener("error", function(ev) {
                             console.log(ev);
-                            thiz.showMsg("The transfer has been canceled.");
+                            thiz.showMsg("An error occured. Status: " + request.statusText);
                         }, false);
+
+                        //request.addEventListener("abort", function(ev) {
+                        //    thiz.showMsg("The transfer has been canceled.");
+                        //}, false);
 
                         request.addEventListener("load", function(ev) {
                             if (request.responseText != "Done.") {
@@ -258,6 +277,13 @@
                         request.send(formData);
 
                         this.request = request
+                    }
+
+                    this.abort = function () {
+                        if (this.request === undefined) { return; }
+                        if (this.request.readyState >= XMLHttpRequest.DONE) { return; }
+
+                        this.request.abort();
                     }
 
                     this.showMsg = function (msg) {
@@ -360,7 +386,6 @@
                     ev.stopPropagation();
                     ev.preventDefault();
 
-                    console.log(ev.dataTransfer);
                     updateSelectedFiles(ev.dataTransfer.files);
                     dropZone.style.display = "none";
                 }, false)
