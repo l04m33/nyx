@@ -199,15 +199,43 @@
                 var uploadForm = document.forms.namedItem("upload"),
                     fileInput = uploadForm.children[0],
                     submitButton = document.getElementById("submit-button"),
-                    selectButton = document.getElementById("select-button");
+                    selectButton = document.getElementById("select-button"),
+                    fileList = document.getElementById("file-list"),
+                    selectedFiles = [];
+
+                function updateSelectedFiles(files) {
+                    if (files && files.length > 0) {
+                        selectedFiles = files;
+
+                        fileList.innerHTML = "";
+                        for (var i = 0; i < files.length; i++) {
+                            var fileLine = document.createElement("li");
+                            fileLine.textContent = files[i].name;
+                            fileLine.classList.add("list-item");
+                            fileList.appendChild(fileLine);
+                        }
+
+                        submitButton.classList.remove("hidden");
+                        selectButton.classList.add("hidden");
+                    } else {
+                        selectedFiles = [];
+
+                        fileList.innerHTML = "";
+                        var fileLine = document.createElement("li");
+                        fileLine.textContent = "No files selected.";
+                        fileList.appendChild(fileLine);
+
+                        submitButton.classList.add("hidden");
+                        selectButton.classList.remove("hidden");
+                    }
+                }
 
                 submitButton.addEventListener("click", function(ev) {
-                    var files = fileInput.files,
+                    var files = selectedFiles,
                         transfers = new Array(files.length),
                         pList = document.getElementById("progress-list");
 
-                    var dummyEv = new CustomEvent("change", {"detail": {"filesOverride": []}});
-                    fileInput.dispatchEvent(dummyEv);
+                    updateSelectedFiles([]);
 
                     pList.innerHTML;
                     for (var i = 0; i < files.length; i++) {
@@ -220,38 +248,8 @@
                     ev.preventDefault();
                 }, false);
 
-                var fileList = document.getElementById("file-list");
-
                 fileInput.addEventListener("change", function(ev) {
-                    var files;
-
-                    if (ev.detail && ev.detail.filesOverride) {
-                        files = ev.detail.filesOverride;
-                    } else {
-                        files = ev.target.files
-                    }
-
-                    if (files && files.length > 0) {
-                        fileList.innerHTML = "";
-
-                        for (var i = 0; i < ev.target.files.length; i++) {
-                            var fileLine = document.createElement("li");
-                            fileLine.textContent = ev.target.files[i].name;
-                            fileLine.classList.add("list-item");
-                            fileList.appendChild(fileLine);
-                        }
-
-                        submitButton.classList.remove("hidden");
-                        selectButton.classList.add("hidden");
-                    } else {
-                        fileList.innerHTML = "";
-                        var fileLine = document.createElement("li");
-                        fileLine.textContent = "No files selected.";
-                        fileList.appendChild(fileLine);
-
-                        submitButton.classList.add("hidden");
-                        selectButton.classList.remove("hidden");
-                    }
+                    updateSelectedFiles(ev.target.files);
                 }, false);
 
                 var dummyEv = new Event("change");
@@ -261,11 +259,25 @@
                     fileInput.click();
                     ev.preventDefault();
                 }, false);
-
                 fileList.addEventListener("click", function (ev) {
                     fileInput.click();
                     ev.preventDefault();
                 }, false);
+
+                document.documentElement.addEventListener("dragenter", function (ev) {
+                    ev.stopPropagation();
+                    ev.preventDefault();
+                }, false)
+                document.documentElement.addEventListener("dragover", function (ev) {
+                    ev.stopPropagation();
+                    ev.preventDefault();
+                }, false)
+                document.documentElement.addEventListener("drop", function (ev) {
+                    ev.stopPropagation();
+                    ev.preventDefault();
+
+                    updateSelectedFiles(ev.dataTransfer.files);
+                }, false)
             })();
         </script>
     </body>
