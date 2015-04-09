@@ -299,6 +299,9 @@ method `[]`(res: DynResource, subRes: string): UrlResource =
             of "recv":
                 res.op = "/recv"
                 return res
+            of "list":
+                res.op = "/list"    # TODO
+                return res
             of "r":
                 res.op = "/r"
                 return res
