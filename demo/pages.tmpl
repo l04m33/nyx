@@ -19,7 +19,7 @@
             }
             .progress-container { position: relative; }
             .progress-bar {
-                z-index: 1;
+                z-index: 11;
                 position: absolute;
                 width: 0px;
                 height: 44px;
@@ -29,7 +29,7 @@
                 border-right: 1px solid #ccc;
             }
             .progress-file-name {
-                z-index: 2;
+                z-index: 12;
                 position: relative;
                 width: auto;
                 height: 14px;
@@ -38,7 +38,7 @@
                 color: #777;
             }
             .progress-message {
-                z-index: 3;
+                z-index: 13;
                 position: relative;
                 width: auto;
                 height: 18px;
@@ -74,6 +74,21 @@
             }
             .button:hover { box-shadow: 0px 2px 2px #aaa; }
             .button:active { box-shadow: 0px 1px 1px #aaa; }
+            .drop-zone {
+                display: none;
+                position: fixed;
+                height: 100%;
+                width: 100%;
+                left: 0px;
+                top: 0px;
+                z-index: 1;
+                background-color: #000;
+                opacity: 0.5;
+                color: #eee;
+                font-family: sans-serif;
+                font-size: 32px;
+                text-align: center;
+            }
         </style>
 
     </head>
@@ -117,6 +132,7 @@
                     #end for
                 </ul>
             </div>
+            <div id="drop-zone" class="drop-zone">Drop files here.</div>
         </div>
 
         <script>
@@ -201,7 +217,8 @@
                     submitButton = document.getElementById("submit-button"),
                     selectButton = document.getElementById("select-button"),
                     fileList = document.getElementById("file-list"),
-                    selectedFiles = [];
+                    selectedFiles = [],
+                    dropZone = document.getElementById("drop-zone");
 
                 function updateSelectedFiles(files) {
                     if (files && files.length > 0) {
@@ -267,16 +284,30 @@
                 document.documentElement.addEventListener("dragenter", function (ev) {
                     ev.stopPropagation();
                     ev.preventDefault();
+
+                    dropZone.style.display = "block";
                 }, false)
-                document.documentElement.addEventListener("dragover", function (ev) {
+                dropZone.addEventListener("dragenter", function (ev) {
                     ev.stopPropagation();
                     ev.preventDefault();
                 }, false)
-                document.documentElement.addEventListener("drop", function (ev) {
+                dropZone.addEventListener("dragleave", function (ev) {
                     ev.stopPropagation();
                     ev.preventDefault();
 
+                    dropZone.style.display = "none";
+                }, false)
+                dropZone.addEventListener("dragover", function (ev) {
+                    ev.stopPropagation();
+                    ev.preventDefault();
+                }, false)
+                dropZone.addEventListener("drop", function (ev) {
+                    ev.stopPropagation();
+                    ev.preventDefault();
+
+                    console.log(ev.dataTransfer);
                     updateSelectedFiles(ev.dataTransfer.files);
+                    dropZone.style.display = "none";
                 }, false)
             })();
         </script>
