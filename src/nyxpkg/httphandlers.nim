@@ -16,8 +16,10 @@ proc handleHttpRequest(client: Client, req: HttpReq, rootFactory: (proc(): UrlRe
     try:
         var res = rootFactory()
         dstRes = res.dispatch(req.path)
-    except PathNotFoundError:
-        discard
+    except HttpError:
+        var exc = HttpErrorRef(getCurrentException())
+        if exc.code != 404:
+            raise
 
     if isNil(dstRes):
         when not defined(nolog):

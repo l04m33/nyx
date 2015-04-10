@@ -10,10 +10,6 @@ import
 
 
 type
-    PathNotFoundError* = object of Exception
-
-
-type
     TUrlResource* = object of RootObj
         handler*: proc(res: UrlResource, c: Client, r: HttpReq): Future[void]
 
@@ -22,7 +18,7 @@ type
 
 proc urlResourceHandler(res: UrlResource, c: Client, req: HttpReq): Future[void] {.async.} =
     if true:
-        raise newException(PathNotFoundError, "`$#` not found" % [UrlUnescape(req.path)])
+        raise newHttpError(404, "`$#` not found" % [UrlUnescape(req.path)])
 
 
 proc newUrlResource*(): UrlResource =
@@ -31,7 +27,7 @@ proc newUrlResource*(): UrlResource =
 
 
 method `[]`*(res: UrlResource, subResName: string): UrlResource =
-    raise newException(PathNotFoundError, "`$#` not found" % [subResName])
+    raise newHttpError(404, "`$#` not found" % [subResName])
 
 
 proc handle*(res: UrlResource, c: Client, req: HttpReq): Future[void] {.async.} =
@@ -97,7 +93,7 @@ proc newStaticRoot*(localPath: string): UrlResource =
         sRoot.path = ""
         return sRoot
     else:
-        raise newException(PathNotFoundError, "`$#` not found" % [localPath])
+        raise newHttpError(404, "`$#` not found" % [localPath])
 
 
 method `[]`*(sRes: StaticUrlResource, subResName: string): UrlResource =

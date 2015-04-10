@@ -18,8 +18,10 @@ proc testDefaultDispatch() =
     var excFlag = false
     try:
         discard r.dispatch("/some/path")
-    except PathNotFoundError:
-        excFlag = true
+    except HttpError:
+        var exc = HttpErrorRef(getCurrentException())
+        if exc.code == 404:
+            excFlag = true
 
     check(excFlag == true)
 
@@ -30,8 +32,10 @@ proc testDefaultDispatch() =
     excFlag = false
     try:
         waitFor(r.handle(client, req))
-    except PathNotFoundError:
-        excFlag = true
+    except HttpError:
+        var exc = HttpErrorRef(getCurrentException())
+        if exc.code == 404:
+            excFlag = true
 
     check(excFlag == true)
 
@@ -42,8 +46,10 @@ proc testStaticDispatch() =
 
     try:
         root = newStaticRoot("doesNotExist.dir")
-    except PathNotFoundError:
-        excFlag = true
+    except HttpError:
+        var exc = HttpErrorRef(getCurrentException())
+        if exc.code == 404:
+            excFlag = true
 
     check(excFlag == true)
 
@@ -88,7 +94,7 @@ method `[]`(res: DynResource, subRes: string): UrlResource =
         of "static":
             return newStaticRoot(".")
         else:
-            raise newException(PathNotFoundError, "$#" % [subRes])
+            raise newHttpError(404, "$#" % [subRes])
 
 
 proc testDynamicDispatch() =
@@ -100,8 +106,10 @@ proc testDynamicDispatch() =
     var excFlag = false
     try:
         discard res.dispatch("/does/not/exist")
-    except PathNotFoundError:
-        excFlag = true
+    except HttpError:
+        var exc = HttpErrorRef(getCurrentException())
+        if exc.code == 404:
+            excFlag = true
 
     check(excFlag == true)
 

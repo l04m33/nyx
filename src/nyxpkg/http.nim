@@ -9,6 +9,18 @@ import
 
 
 type
+    HttpError* = object of Exception
+        code*: int
+
+    HttpErrorRef* = ref HttpError
+
+
+proc newHttpError*(code: int, msg: string): HttpErrorRef =
+    result = newException(HttpError, msg)
+    result.code = code
+
+
+type
     StrKeyValue* = tuple[key: string, value: string]
 
     HttpHeader* = StrKeyValue

@@ -304,23 +304,23 @@ method `[]`(res: DynResource, subRes: string): UrlResource =
                 res.op = "/r"
                 return res
             else:
-                raise newException(PathNotFoundError, "$#" % [subRes])
+                raise newHttpError(404, "'$#' not found" % [subRes])
 
     elif res.op == "/r":
         if res.recvId < 0:
             try:
                 res.recvId = parseInt(subRes)
             except ValueError:
-                raise newException(PathNotFoundError, "$#" % [subRes])
+                raise newHttpError(404, "'$#' not found" % [subRes])
         elif isNil(res.recvName):
             res.recvName = UrlUnescape(subRes)
         else:
-            raise newException(PathNotFoundError, "$#" % [subRes])
+            raise newHttpError(404, "'$#' not found" % [subRes])
 
         return res
 
     else:
-        raise newException(PathNotFoundError, "$#" % [subRes])
+        raise newHttpError(404, "'$#' not found" % [subRes])
 
 
 when isMainModule:
