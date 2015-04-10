@@ -267,6 +267,7 @@ proc dynResourceHandler(res: UrlResource, c: Client, req: HttpReq): Future[void]
                 await c.writer.write(fileContent)
                 fileContent = await transfer.reader.read(8192)
 
+            # TODO: handle disconnection of receiver
             transfer.done.complete()
             debug("recv: entryIdx = $#, transfer completed, totalLen = $#, content-length = $#" % [$entryIdx, $totalLen, $(transfer.contentLength)])
             if totalLen < transfer.contentLength:
