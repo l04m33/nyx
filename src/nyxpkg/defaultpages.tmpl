@@ -1,0 +1,20 @@
+#! stdtmpl
+#proc defaultErrorPage(code: int): string =
+#   let codeStr = $code
+#   let msg = getStatusCode(code)
+#   result = ""
+<html>
+    <head>
+        <meta http-equiv="content-type" content="text/html; charset=utf-8">
+        <title>Error: $codeStr</title>
+
+        <style>
+        </style>
+    </head>
+
+    <body>
+        <h1>Error</h1>
+        <p>$codeStr - $msg</p>
+    </body>
+</html>
+#end proc

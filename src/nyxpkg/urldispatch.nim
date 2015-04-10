@@ -79,9 +79,7 @@ proc staticUrlResourceHandler(res: UrlResource, c: Client, req: HttpReq): Future
 
         f.close()
     else:
-        resp = newHttpResp(404)
-        resp.headers.add((key: "Content-Length", value: $0))    # TODO
-        await c.writer.write($resp)
+        raise newHttpError(404, "'$#' not found" % [path])
 
 
 proc newStaticRoot*(localPath: string): UrlResource =

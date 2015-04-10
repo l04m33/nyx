@@ -8,60 +8,82 @@ import
     nyxpkg/logging
 
 
-proc handleHttpRequest(client: Client, req: HttpReq, rootFactory: (proc(): UrlResource)): Future[void] {.async.} =
+type
+    RootFactory = proc(): UrlResource
+
+    HttpErrorHandler = proc(e: HttpErrorRef, c: Client, r: HttpReq): Future[void]
+
+
+include "defaultpages.tmpl"
+
+
+proc defaultHttpErrorHandler(exc: HttpErrorRef, c: Client, r: HttpReq): Future[void] {.async, procvar.} =
+    var resp = newHttpResp(exc.code)
+    var pageContent = defaultErrorPage(exc.code)
+    resp.headers.add((key: "Content-Length", value: $(pageContent.len())))
+    resp.headers.add((key: "Content-Type", value: "text/html"))
+    await c.writer.write($resp)
+    await c.writer.write(pageContent)
+
+
+proc handleHttpRequest(client: Client, req: HttpReq, rootFactory: RootFactory, errorHandler: HttpErrorHandler = defaultHttpErrorHandler): Future[void] {.async.} =
     when not defined(nolog):
         var cid = client.id()
 
-    var dstRes: UrlResource = nil
+    var
+        dstRes: UrlResource = nil
+        httpExc: HttpErrorRef = nil
+
     try:
         var res = rootFactory()
         dstRes = res.dispatch(req.path)
     except HttpError:
-        var exc = HttpErrorRef(getCurrentException())
-        if exc.code != 404:
-            raise
+        httpExc = HttpErrorRef(getCurrentException())
 
-    if isNil(dstRes):
+    if not isNil(httpExc):
         when not defined(nolog):
-            debug("cid = $#, status = $#" % [$cid, $404])
+            debug("cid = $#, status = $#" % [$cid, $(httpExc.code)])
 
-        var resp = newHttpResp(404)
-        resp.headers.add((key: "Content-Length", value: "0"))
-        await client.writer.write($resp)
+        await errorHandler(httpExc, client, req)
         return
 
-    var excFlag = false
+    var exc: ref Exception = nil
+
     try:
         await dstRes.handle(client, req)
+    except HttpError:
+        exc = getCurrentException()
+        httpExc = HttpErrorRef(exc)
     except:
+        exc = getCurrentException()
+
+    if not isNil(exc):
         client.closeResources()
 
-        var msg = getCurrentExceptionMsg()
-        debug("method handler failed, msg = $#" % [msg])
-
-        var
-            exc = getCurrentException()
-            trace = exc.getStackTrace()
-        if not isNil(trace) and trace != "":
-            debug(exc.getStackTrace())
-
-        excFlag = true
-
-    if excFlag:
         when not defined(nolog):
-            debug("cid = $#, status = $#" % [$cid, $500])
+            if isNil(httpExc):
+                debug("cid = $#, status = $#" % [$cid, $500])
+            else:
+                debug("cid = $#, status = $#" % [$cid, $(httpExc.code)])
 
-        var resp = newHttpResp(500)
-        resp.headers.add((key: "Content-Length", value: "0"))
-        await client.writer.write($resp)
+        var trace = exc.getStackTrace()
+        if not isNil(trace) and trace != "":
+            debug(trace)
+
+        if isNil(httpExc):
+            var resp = newHttpResp(500)
+            resp.headers.add((key: "Content-Length", value: "0"))
+            await client.writer.write($resp)
+        else:
+            await errorHandler(httpExc, client, req)
 
 
-proc handleHttpClient*(client: Client, rootFactory: (proc(): UrlResource)): Future[Client] {.async, procvar.} =
+proc handleHttpClient*(client: Client, rootFactory: RootFactory, errorHandler: HttpErrorHandler = defaultHttpErrorHandler): Future[Client] {.async, procvar.} =
     while not client.isClosed():
         var req = await newHttpReq(client.reader)
 
         if not isNil(req.meth):
-            await handleHttpRequest(client, req, rootFactory)
+            await handleHttpRequest(client, req, rootFactory, errorHandler)
 
             var connVal = req.getFirstHeader("Connection")
             if isNil(connVal) or connVal.toUpper() == "KEEP-ALIVE":
