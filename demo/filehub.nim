@@ -260,12 +260,18 @@ proc dynResourceHandler(res: UrlResource, c: Client, req: HttpReq): Future[void]
                 resp.headers.add((key: "Content-Type", value: transfer.contentType))
             await c.writer.write($resp)
 
+            var totalLen = 0
             var fileContent = await transfer.reader.read(8192)
             while fileContent.len() > 0:
+                totalLen += fileContent.len()
                 await c.writer.write(fileContent)
                 fileContent = await transfer.reader.read(8192)
 
             transfer.done.complete()
+            debug("recv: entryIdx = $#, transfer completed, totalLen = $#, content-length = $#" % [$entryIdx, $totalLen, $(transfer.contentLength)])
+            if totalLen < transfer.contentLength:
+                # The transfer was canceled on the sender side, we tell the receiver then.
+                c.close()
 
         else:
             await showErrorPage(500, c)

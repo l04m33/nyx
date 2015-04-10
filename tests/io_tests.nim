@@ -1,9 +1,18 @@
 import
     asyncnet,
     asyncdispatch,
+    rawsockets,
     strutils,
     nyxpkg/io,
     testutils
+
+
+proc getDummyListener(): AsyncSocket =
+    result = newAsyncSocket();
+
+    result.setSockOpt(OptReuseAddr, true)
+    result.bindAddr(port=Port(7357), address="127.0.0.1")
+    result.listen(backlog=SOMAXCONN)
 
 
 proc testReaderPutAndRead() =
@@ -115,6 +124,105 @@ proc testLengthReader() =
     check(data == "")
 
 
+proc testAsyncSocketReader() =
+    var ls = getDummyListener()
+
+    var s = newAsyncSocket();
+    waitFor(s.connect("127.0.0.1", Port(7357)));
+    var ps = waitFor(ls.accept())
+
+    var r = Reader(newAsyncSocketReader(s))
+
+    waitFor(ps.send("abcd\r\L\r\L1234"))
+    var data = waitFor(r.readLine())
+    check(data == "abcd")
+
+    data = waitFor(r.readLine())
+    check(data == "\r\L")
+
+    data = waitFor(r.read(4))
+    check(data == "1234")
+
+    ps.close()
+    data = waitFor(r.read(4))
+    check(data == "")
+
+    r.put("321")
+    data = waitFor(r.read(4))
+    check(data == "321")
+
+    s.close()
+    ls.close()
+
+
+proc testLengthReader2() =
+    var ls = getDummyListener()
+
+    var s = newAsyncSocket();
+    waitFor(s.connect("127.0.0.1", Port(7357)));
+    var ps = waitFor(ls.accept())
+
+    var r = Reader(newLengthReader(newAsyncSocketReader(s), 10))
+    waitFor(ps.send("abcd\r\L\r\L1234"))
+    var data = waitFor(r.read(11))
+    check(data == "abcd\r\L\r\L12")
+
+    discard waitFor(s.recv(2))
+
+    r = Reader(newLengthReader(newAsyncSocketReader(s), 10))
+    waitFor(ps.send("abcd\r\L\r\L1234"))
+    data = waitFor(r.readLine())
+    check(data == "abcd")
+    data = waitFor(r.readLine())
+    check(data == "\r\L")
+
+    ps.close()
+    data = waitFor(r.readLine())
+    check(data == "")
+
+    s.close()
+    ls.close()
+
+
+proc testBoundaryReader2() =
+    var ls = getDummyListener()
+
+    var s = newAsyncSocket();
+    waitFor(s.connect("127.0.0.1", Port(7357)));
+    var ps = waitFor(ls.accept())
+
+    var boundary = "--thisisboundary"
+    var payload = "abcd\r\L\r\L1234\r\L--" & boundary & "--\r\L"
+    var lr = newLengthReader(newAsyncSocketReader(s), payload.len())
+    var r = Reader(newBoundaryReader(lr, boundary))
+    waitFor(ps.send(payload))
+
+    var data = waitFor(r.read(8))
+    check(data == "abcd\r\L\r\L")
+
+    data = waitFor(r.read(8))
+    check(data == "1234")
+
+    data = waitFor(r.read(8))
+    check(data == "")
+
+    data = waitFor(lr.read(8))
+    check(data == "")
+
+    payload = "abcd1234"
+    lr = newLengthReader(newAsyncSocketReader(s), payload.len())
+    r = Reader(newBoundaryReader(lr, boundary))
+    waitFor(ps.send(payload))
+
+    ps.close()
+    data = waitFor(r.read(9))
+    check(data == "abcd1234")
+    data = waitFor(r.read(9))
+    check(data == "")
+
+    s.close()
+    ls.close()
+
 proc testBoundaryReader() =
     var s = newAsyncSocket()
     var boundary = "--thisisboundary"
@@ -143,7 +251,10 @@ proc doTests*() =
     testReaderPutAndRead()
     testReaderPutAndReadLine()
     testLengthReader()
+    testAsyncSocketReader()
+    testLengthReader2()
     testBoundaryReader()
+    testBoundaryReader2()
 
 
 when isMainModule:

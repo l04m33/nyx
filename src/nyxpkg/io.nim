@@ -226,7 +226,10 @@ proc bRead*(r: Reader, size: int): Future[string] {.async.} =
             else:
                 padded = result
 
-            var paddingIdx = padded.find("--\r\L", result.len() - 3)
+            #debug("bRead: padded = '$#'" % [padded])
+
+            var paddingIdx = padded.find("--\r\L", result.len() - 4)
+            #debug("bRead: paddingIdx = $#" % [$paddingIdx])
             if paddingIdx >= 0:
                 br.reader.put(padded[(paddingIdx + 4)..(padded.len() - 1)])
             else:
