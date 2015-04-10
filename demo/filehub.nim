@@ -53,15 +53,6 @@ proc waitForTransfer(c: Client, t: TransEntry): Future[void] {.async.} =
     await doneFuture    # XXX: can't say `await t.done` here, why?
 
 
-proc showErrorPage(code: int, c: Client): Future[void] {.async.} =
-    var resp = newHttpResp(code)
-    var pageContent = pageError(code)
-    resp.headers.add((key: "Content-Length", value: $(pageContent.len())))
-    resp.headers.add((key: "Content-Type", value: "text/html"))
-    await c.writer.write($resp)
-    await c.writer.write(pageContent)
-
-
 proc showErrorPage(resp: HttpResp, c: Client): Future[void] {.async.} =
     var pageContent = pageError(resp.status)
     resp.headers.add((key: "Content-Length", value: $(pageContent.len())))
@@ -135,8 +126,7 @@ proc dynResourceHandler(res: UrlResource, c: Client, req: HttpReq): Future[void]
     case d.op
         of "/":
             if req.meth != "GET":
-                await showErrorPage(400, c)
-                return
+                raise newHttpError(400, "only GET method is accepted")
 
             resp = newHttpResp(200)
             var pageContent = pageList(shelf)
@@ -147,21 +137,18 @@ proc dynResourceHandler(res: UrlResource, c: Client, req: HttpReq): Future[void]
 
         of "/send":
             if req.meth != "POST":
-                await showErrorPage(400, c)
-                return
+                raise newHttpError(400, "only POST method is accepted")
 
             var contentType = req.getFirstHeader("Content-Type")
             var boundary = parseBoundary(contentType)
             if isNil(boundary) or boundary.len() == 0:
-                await showErrorPage(400, c)
-                return
+                raise newHttpError(400, "no boundary found for multipart data")
 
             debug("send: boundary = '$#'" % [boundary])
 
             var contentLengthStr = req.getFirstHeader("Content-Length")
             if isNil(contentLengthStr):
-                await showErrorPage(400, c)
-                return
+                raise newHttpError(400, "no CONTENT-LENGTH header")
 
             var contentLength = parseInt(contentLengthStr)
 
@@ -177,8 +164,7 @@ proc dynResourceHandler(res: UrlResource, c: Client, req: HttpReq): Future[void]
             var data = await reader.readLine()
             debug("send: data = '$#'" % [data])
             if data != ("--" & boundary):
-                await showErrorPage(400, c)
-                return
+                raise newHttpError(400, "first line is not the boundary")
 
             data = await reader.readLine()
             debug("send: data = '$#'" % [data])
@@ -205,17 +191,14 @@ proc dynResourceHandler(res: UrlResource, c: Client, req: HttpReq): Future[void]
 
         of "/recv":
             if req.meth != "GET":
-                await showErrorPage(400, c)
-                return
+                raise newHttpError(400, "only GET method is accepted")
 
             if isNil(req.query):
-                await showErrorPage(400, c)
-                return
+                raise newHttpError(400, "no query string")
 
             var entryIdxStr = parseQuery(req.query).getFirstValue("e")
             if isNil(entryIdxStr):
-                await showErrorPage(400, c)
-                return
+                raise newHttpError(400, "no entry parameter")
 
             var entryIdx: int = -1
             try:
@@ -224,14 +207,12 @@ proc dynResourceHandler(res: UrlResource, c: Client, req: HttpReq): Future[void]
                 discard
 
             if entryIdx < 0:
-                await showErrorPage(400, c)
-                return
+                raise newHttpError(400, "failed to parse entry idx")
 
             debug("recv: entryIdx = $#" % [$entryIdx])
 
             if not shelf.hasKey(entryIdx):
-                await showErrorPage(404, c)
-                return
+                raise newHttpError(404, "entry not found")
 
             resp = newHttpResp(303)
             resp.headers.add((key: "Location", value: "r/$#/$#" % [$entryIdx, UrlEscape(shelf[entryIdx].name)]))
@@ -239,16 +220,14 @@ proc dynResourceHandler(res: UrlResource, c: Client, req: HttpReq): Future[void]
 
         of "/r":
             if req.meth != "GET":
-                await showErrorPage(400, c)
-                return
+                raise newHttpError(400, "only GET method is accepted")
 
             var entryIdx = d.recvId
 
             debug("recv: entryIdx = $#" % [$entryIdx])
 
             if not shelf.hasKey(entryIdx):
-                await showErrorPage(404, c)
-                return
+                raise newHttpError(404, "entry not found")
 
             resp = newHttpResp(200)
 
@@ -275,7 +254,7 @@ proc dynResourceHandler(res: UrlResource, c: Client, req: HttpReq): Future[void]
                 c.close()
 
         else:
-            await showErrorPage(500, c)
+            raise newHttpError(500, "no matching operation")
 
 
 proc dynamicRootFactory(): UrlResource =

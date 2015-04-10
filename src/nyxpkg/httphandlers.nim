@@ -66,6 +66,8 @@ proc handleHttpRequest(client: Client, req: HttpReq, rootFactory: RootFactory, e
             else:
                 debug("cid = $#, status = $#" % [$cid, $(httpExc.code)])
 
+        if not isNil(exc.msg) and exc.msg != "":
+            debug("exc.msg = `$#`" % [exc.msg])
         var trace = exc.getStackTrace()
         if not isNil(trace) and trace != "":
             debug(trace)
