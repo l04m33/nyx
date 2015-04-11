@@ -2,6 +2,7 @@ import
     asyncdispatch,
     strutils,
     tables,
+    json,
     nyxpkg/server,
     nyxpkg/client,
     nyxpkg/http,
@@ -253,6 +254,27 @@ proc dynResourceHandler(res: UrlResource, c: Client, req: HttpReq): Future[void]
                 # The transfer was canceled on the sender side, we tell the receiver then.
                 c.close()
 
+        of "/list":
+            # TODO
+            if req.meth != "GET":
+                raise newHttpError(400, "only GET method is accepted")
+
+            var jsonArray = newJArray()
+            for i, t in pairs(shelf):
+                var jsonObj = %[
+                    (key: "name", val: %(t.name)),
+                    (key: "size", val: %(t.contentLength)),
+                    #(key: "tag", val: %(t.tag)),
+                    (key: "url", val: %("recv?e=$#" % [$i]))
+                ]
+                jsonArray.add(jsonObj)
+
+            var content = jsonArray.pretty()
+            resp = newHttpResp(200)
+            resp.headers.add((key: "Content-Length", value: $(content.len())))
+            await c.writer.write($resp)
+            await c.writer.write(content)
+
         else:
             raise newHttpError(500, "no matching operation")
 
@@ -277,7 +299,7 @@ method `[]`(res: DynResource, subRes: string): UrlResource =
                 res.op = "/recv"
                 return res
             of "list":
-                res.op = "/list"    # TODO
+                res.op = "/list"
                 return res
             of "r":
                 res.op = "/r"

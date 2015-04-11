@@ -73,9 +73,8 @@ proc handleHttpRequest(client: Client, req: HttpReq, rootFactory: RootFactory, e
             debug(trace)
 
         if isNil(httpExc):
-            var resp = newHttpResp(500)
-            resp.headers.add((key: "Content-Length", value: "0"))
-            await client.writer.write($resp)
+            debug("handleHttpRequest: runtime error, closing client")
+            client.close()
         else:
             await errorHandler(httpExc, client, req)
 
