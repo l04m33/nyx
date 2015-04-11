@@ -73,6 +73,7 @@ proc handleHttpRequest(client: Client, req: HttpReq, rootFactory: RootFactory, e
             debug(trace)
 
         if isNil(httpExc):
+            # TODO: what about a 500 error?
             debug("handleHttpRequest: runtime error, closing client")
             client.close()
         else:

@@ -131,7 +131,7 @@ type
 
 proc asWrite*(w: Writer, buf: string): Future[void] {.async.} =
     var sw = AsyncSocketWriter(w)
-    await sw.socket.send(buf)
+    await sw.socket.send(buf, flags={})
 
 
 proc newAsyncSocketWriter*(socket: AsyncSocket): AsyncSocketWriter =
