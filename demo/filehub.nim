@@ -52,6 +52,8 @@ proc waitForTransfer(c: Client, t: TransEntry): Future[void] {.async.} =
     var doneFuture = t.done
     shelf[c.id()] = t
     await doneFuture    # XXX: can't say `await t.done` here, why?
+    if doneFuture.failed():
+        raise (doneFuture.error)
 
 
 proc showErrorPage(resp: HttpResp, c: Client): Future[void] {.async.} =
@@ -184,7 +186,13 @@ proc dynResourceHandler(res: UrlResource, c: Client, req: HttpReq): Future[void]
                 var transCL = LengthReader(reader).remaining - (boundary.len() + "--".len() * 2 + "\r\L".len() * 2)
                 t.contentLength = transCL
 
-                await waitForTransfer(c, t)
+                try:
+                    await waitForTransfer(c, t)
+                except:
+                    debug("transfer failed, closing sender connection")
+                    c.close()
+                    return
+
                 data = await reader.readLine()
                 debug("send: data = '$#'" % [data])
 
@@ -244,10 +252,18 @@ proc dynResourceHandler(res: UrlResource, c: Client, req: HttpReq): Future[void]
             var fileContent = await transfer.reader.read(8192)
             while fileContent.len() > 0:
                 totalLen += fileContent.len()
-                await c.writer.write(fileContent)
+
+                try:
+                    await c.writer.write(fileContent)
+                except:
+                    var exc = getCurrentException()
+                    debug("transfer failed, exc.msg = `$#`" % [exc.msg])
+                    transfer.done.fail(exc)
+                    c.close()
+                    return
+
                 fileContent = await transfer.reader.read(8192)
 
-            # TODO: handle disconnection of receiver
             transfer.done.complete()
             debug("recv: entryIdx = $#, transfer completed, totalLen = $#, content-length = $#" % [$entryIdx, $totalLen, $(transfer.contentLength)])
             if totalLen < transfer.contentLength:
