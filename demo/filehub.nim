@@ -52,6 +52,7 @@ proc waitForTransfer(c: Client, t: TransEntry): Future[void] {.async.} =
     var doneFuture = t.done
     shelf[c.id()] = t
     await doneFuture    # XXX: can't say `await t.done` here, why?
+    # XXX: Why doesn't the `await` statement raise this exception?
     if doneFuture.failed():
         raise (doneFuture.error)
 
