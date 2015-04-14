@@ -275,7 +275,7 @@
                             }
                         }, false);
 
-                        request.open("POST", "send");
+                        request.open("POST", "send", true);
                         request.send(formData);
 
                         this.request = request
@@ -391,6 +391,62 @@
                     updateSelectedFiles(ev.dataTransfer.files);
                     dropZone.style.display = "none";
                 }, false)
+
+                var remoteFileList = document.getElementById("remote-file-list");
+                function refreshRemoteFileList() {
+                    var request = new XMLHttpRequest();
+                    request.timeout = 2000;
+
+                    request.addEventListener("load", function (ev) {
+                        var retObj;
+                        try {
+                            retObj = JSON.parse(request.responseText);
+                        } catch (e) {
+                            console.log(e);
+                            setTimeout(refreshRemoteFileList, 2000);
+                        }
+
+                        if (retObj.fileList !== undefined) {
+                            var objList = retObj.fileList;
+
+                            remoteFileList.innerHTML = "";
+
+                            for (var i = 0; i < objList.length; i++) {
+                                var li = document.createElement("li");
+                                li.classList.add("list-item");
+
+                                if (objList[i].tag !== undefined) {
+                                    li.innerHTML =
+                                        "<a href=\"" + objList[i].url + "\" target=\"_blank\">" +
+                                            "<span>" + objList[i].id + "</span> / <span>" + objList[i].name + "</span>" +
+                                            " - <span>" + objList[i].tag + "</span>" +
+                                        "</a>"
+                                } else {
+                                    li.innerHTML =
+                                        "<a href=\"" + objList[i].url + "\" target=\"_blank\">" +
+                                            "<span>" + objList[i].id + "</span> / <span>" + objList[i].name + "</span>"
+                                        "</a>"
+                                }
+
+                                remoteFileList.appendChild(li);
+                            }
+                        }
+
+                        setTimeout(refreshRemoteFileList, 2000);
+                    }, false);
+
+                    function onRequestError(ev) {
+                        console.log(ev);
+                        setTimeout(refreshRemoteFileList, 2000);
+                    }
+                    request.addEventListener("error", onRequestError, false);
+                    request.addEventListener("timeout", onRequestError, false);
+
+                    request.open("GET", "list", true);
+                    request.send();
+                }
+
+                refreshRemoteFileList();
             })();
         </script>
     </body>

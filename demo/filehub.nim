@@ -272,23 +272,26 @@ proc dynResourceHandler(res: UrlResource, c: Client, req: HttpReq): Future[void]
                 c.close()
 
         of "/list":
-            # TODO
             if req.meth != "GET":
                 raise newHttpError(400, "only GET method is accepted")
 
             var jsonArray = newJArray()
             for i, t in pairs(shelf):
                 var jsonObj = %[
+                    (key: "id", val: %(i)),
                     (key: "name", val: %(t.name)),
                     (key: "size", val: %(t.contentLength)),
-                    #(key: "tag", val: %(t.tag)),
+                    #(key: "tag", val: %(t.tag)),   # TODO
                     (key: "url", val: %("recv?e=$#" % [$i]))
                 ]
                 jsonArray.add(jsonObj)
 
-            var content = jsonArray.pretty()
+            var retObj = %[(key: "fileList", val: jsonArray)]
+
+            var content = retObj.pretty()
             resp = newHttpResp(200)
             resp.headers.add((key: "Content-Length", value: $(content.len())))
+            resp.headers.add((key: "Content-Type", value: "application/json"))
             await c.writer.write($resp)
             await c.writer.write(content)
 
