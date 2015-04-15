@@ -13,22 +13,20 @@ import
 
 
 type
-    TDynResource = object of TUrlResource
-        op: string
+    TRootResource = object of TUrlResource
+    RootResource = ref TRootResource
+
+    CmdResource = ref object of TUrlResource
         recvId: int
         recvName: string
 
-    DynResource = ref TDynResource
-
-    TTransEntry = object of RootObj
+    TransEntry = ref object of RootObj
         name: string
         contentType: string
         contentLength: int
         tag: string
         reader: Reader
         done: Future[void]
-
-    TransEntry = ref TTransEntry
 
 
 include "pages.tmpl"
@@ -120,214 +118,219 @@ proc parseFileInfo(partHeaders: seq[HttpHeader], reader: Reader): TransEntry =
     return newTransEntry(fileName, ct, nil, reader)
 
 
-proc dynResourceHandler(res: UrlResource, c: Client, req: HttpReq): Future[void] {.async.} =
-    var d = DynResource(res)
-
-    debug("dynResourceHandler: d.op = $#" % [d.op])
-
+proc rootResourceHandler(res: UrlResource, c: Client, req: HttpReq): Future[void] {.async.} =
     var resp: HttpResp
 
-    case d.op
-        of "/":
-            if req.meth != "GET":
-                raise newHttpError(400, "only GET method is accepted")
+    if req.meth != "GET":
+        raise newHttpError(400, "only GET method is accepted")
 
-            resp = newHttpResp(200)
-            var pageContent = pageList(shelf)
-            resp.headers.add((key: "Content-Length", value: $(pageContent.len())))
-            resp.headers.add((key: "Content-Type", value: "text/html"))
-            await c.writer.write($resp)
-            await c.writer.write(pageContent)
-
-        of "/send":
-            if req.meth != "POST":
-                raise newHttpError(400, "only POST method is accepted")
-
-            var contentType = req.getFirstHeader("Content-Type")
-            var boundary = parseBoundary(contentType)
-            if isNil(boundary) or boundary.len() == 0:
-                raise newHttpError(400, "no boundary found for multipart data")
-
-            debug("send: boundary = '$#'" % [boundary])
-
-            var contentLengthStr = req.getFirstHeader("Content-Length")
-            if isNil(contentLengthStr):
-                raise newHttpError(400, "no CONTENT-LENGTH header")
-
-            var contentLength = parseInt(contentLengthStr)
-
-            debug("send: contentLength = '$#'" % [$contentLength])
-
-            resp = newHttpResp(200)
-            resp.headers.add((key: "Content-Length", value: $5))
-            resp.headers.add((key: "Content-Type", value: "text/plain"))
-            await c.writer.write($resp)
-
-            var reader = Reader(newLengthReader(c.reader, contentLength))
-
-            var data = await reader.readLine()
-            debug("send: data = '$#'" % [data])
-            if data != ("--" & boundary):
-                raise newHttpError(400, "first line is not the boundary")
-
-            data = await reader.readLine()
-            debug("send: data = '$#'" % [data])
-            while data.len() > 0:
-                var partHeaders: seq[HttpHeader] = @[]
-                while data != "\r\L" and data.len() > 0:
-                    parseHeader(data, partHeaders)
-                    data = await reader.readLine()
-                    debug("send: data = '$#'" % [data])
-
-                var boundaryReader = Reader(newBoundaryReader(reader, boundary))
-                var t = parseFileInfo(partHeaders, boundaryReader)
-                if isNil(t):
-                    break
-
-                var transCL = LengthReader(reader).remaining - (boundary.len() + "--".len() * 2 + "\r\L".len() * 2)
-                t.contentLength = transCL
-
-                try:
-                    await waitForTransfer(c, t)
-                except:
-                    debug("transfer failed, closing sender connection")
-                    c.close()
-                    return
-
-                data = await reader.readLine()
-                debug("send: data = '$#'" % [data])
-
-            await c.writer.write("Done.")
-
-        of "/recv":
-            if req.meth != "GET":
-                raise newHttpError(400, "only GET method is accepted")
-
-            if isNil(req.query):
-                raise newHttpError(400, "no query string")
-
-            var entryIdxStr = parseQuery(req.query).getFirstValue("e")
-            if isNil(entryIdxStr):
-                raise newHttpError(400, "no entry parameter")
-
-            var entryIdx: int = -1
-            try:
-                entryIdx = parseInt(entryIdxStr)
-            except ValueError:
-                discard
-
-            if entryIdx < 0:
-                raise newHttpError(400, "failed to parse entry idx")
-
-            debug("recv: entryIdx = $#" % [$entryIdx])
-
-            if not shelf.hasKey(entryIdx):
-                raise newHttpError(404, "entry not found")
-
-            resp = newHttpResp(303)
-            resp.headers.add((key: "Location", value: "r/$#/$#" % [$entryIdx, UrlEscape(shelf[entryIdx].name)]))
-            await showErrorPage(resp, c)
-
-        of "/r":
-            if req.meth != "GET":
-                raise newHttpError(400, "only GET method is accepted")
-
-            var entryIdx = d.recvId
-
-            debug("recv: entryIdx = $#" % [$entryIdx])
-
-            if not shelf.hasKey(entryIdx):
-                raise newHttpError(404, "entry not found")
-
-            resp = newHttpResp(200)
-
-            var transfer = shelf[entryIdx]
-            shelf.del(entryIdx)
-
-            resp.headers.add((key: "Content-Length", value: $(transfer.contentLength)))
-            if not isNil(transfer.contentType):
-                resp.headers.add((key: "Content-Type", value: transfer.contentType))
-            await c.writer.write($resp)
-
-            var totalLen = 0
-            var fileContent = await transfer.reader.read(8192)
-            while fileContent.len() > 0:
-                totalLen += fileContent.len()
-
-                try:
-                    await c.writer.write(fileContent)
-                except:
-                    var exc = getCurrentException()
-                    debug("transfer failed, exc.msg = `$#`" % [exc.msg])
-                    transfer.done.fail(exc)
-                    c.close()
-                    return
-
-                fileContent = await transfer.reader.read(8192)
-
-            transfer.done.complete()
-            debug("recv: entryIdx = $#, transfer completed, totalLen = $#, content-length = $#" % [$entryIdx, $totalLen, $(transfer.contentLength)])
-            if totalLen < transfer.contentLength:
-                # The transfer was canceled on the sender side, we tell the receiver then.
-                c.close()
-
-        of "/list":
-            if req.meth != "GET":
-                raise newHttpError(400, "only GET method is accepted")
-
-            var jsonArray = newJArray()
-            for i, t in pairs(shelf):
-                var jsonObj = %[
-                    (key: "id", val: %(i)),
-                    (key: "name", val: %(t.name)),
-                    (key: "size", val: %(t.contentLength)),
-                    #(key: "tag", val: %(t.tag)),   # TODO
-                    (key: "url", val: %("recv?e=$#" % [$i]))
-                ]
-                jsonArray.add(jsonObj)
-
-            var retObj = %[(key: "fileList", val: jsonArray)]
-
-            var content = retObj.pretty()
-            resp = newHttpResp(200)
-            resp.headers.add((key: "Content-Length", value: $(content.len())))
-            resp.headers.add((key: "Content-Type", value: "application/json"))
-            await c.writer.write($resp)
-            await c.writer.write(content)
-
-        else:
-            raise newHttpError(500, "no matching operation")
+    resp = newHttpResp(200)
+    var pageContent = pageList(shelf)
+    resp.headers.add((key: "Content-Length", value: $(pageContent.len())))
+    resp.headers.add((key: "Content-Type", value: "text/html"))
+    await c.writer.write($resp)
+    await c.writer.write(pageContent)
 
 
-proc dynamicRootFactory(): UrlResource =
-    var root: DynResource
+proc rootFactory(): UrlResource =
+    var root: RootResource
     new(root)
-    root.handler = dynResourceHandler
-    root.op = "/"
-    root.recvId = -1
-    root.recvName = nil
+    root.handler = rootResourceHandler
     return root
 
 
-method `[]`(res: DynResource, subRes: string): UrlResource =
-    if res.op == "/":
-        case subRes
-            of "send":
-                res.op = "/send"
-                return res
-            of "recv":
-                res.op = "/recv"
-                return res
-            of "list":
-                res.op = "/list"
-                return res
-            of "r":
-                res.op = "/r"
-                return res
-            else:
-                raise newHttpError(404, "'$#' not found" % [subRes])
+proc cmdSendHandler(res: UrlResource, c: Client, req: HttpReq): Future[void] {.async.} =
+    var resp: HttpResp
 
-    elif res.op == "/r":
+    if req.meth != "POST":
+        raise newHttpError(400, "only POST method is accepted")
+
+    var contentType = req.getFirstHeader("Content-Type")
+    var boundary = parseBoundary(contentType)
+    if isNil(boundary) or boundary.len() == 0:
+        raise newHttpError(400, "no boundary found for multipart data")
+
+    debug("send: boundary = '$#'" % [boundary])
+
+    var contentLengthStr = req.getFirstHeader("Content-Length")
+    if isNil(contentLengthStr):
+        raise newHttpError(400, "no CONTENT-LENGTH header")
+
+    var contentLength = parseInt(contentLengthStr)
+
+    debug("send: contentLength = '$#'" % [$contentLength])
+
+    resp = newHttpResp(200)
+    resp.headers.add((key: "Content-Length", value: $5))
+    resp.headers.add((key: "Content-Type", value: "text/plain"))
+    await c.writer.write($resp)
+
+    var reader = Reader(newLengthReader(c.reader, contentLength))
+
+    var data = await reader.readLine()
+    debug("send: data = '$#'" % [data])
+    if data != ("--" & boundary):
+        raise newHttpError(400, "first line is not the boundary")
+
+    data = await reader.readLine()
+    debug("send: data = '$#'" % [data])
+    while data.len() > 0:
+        var partHeaders: seq[HttpHeader] = @[]
+        while data != "\r\L" and data.len() > 0:
+            parseHeader(data, partHeaders)
+            data = await reader.readLine()
+            debug("send: data = '$#'" % [data])
+
+        var boundaryReader = Reader(newBoundaryReader(reader, boundary))
+        var t = parseFileInfo(partHeaders, boundaryReader)
+        if isNil(t):
+            break
+
+        var transCL = LengthReader(reader).remaining - (boundary.len() + "--".len() * 2 + "\r\L".len() * 2)
+        t.contentLength = transCL
+
+        try:
+            await waitForTransfer(c, t)
+        except:
+            debug("transfer failed, closing sender connection")
+            c.close()
+            return
+
+        data = await reader.readLine()
+        debug("send: data = '$#'" % [data])
+
+    await c.writer.write("Done.")
+
+
+proc cmdRecvHandler(res: UrlResource, c: Client, req: HttpReq): Future[void] {.async.} =
+    var resp: HttpResp
+
+    if req.meth != "GET":
+        raise newHttpError(400, "only GET method is accepted")
+
+    if isNil(req.query):
+        raise newHttpError(400, "no query string")
+
+    var entryIdxStr = parseQuery(req.query).getFirstValue("e")
+    if isNil(entryIdxStr):
+        raise newHttpError(400, "no entry parameter")
+
+    var entryIdx: int = -1
+    try:
+        entryIdx = parseInt(entryIdxStr)
+    except ValueError:
+        discard
+
+    if entryIdx < 0:
+        raise newHttpError(400, "failed to parse entry idx")
+
+    debug("recv: entryIdx = $#" % [$entryIdx])
+
+    if not shelf.hasKey(entryIdx):
+        raise newHttpError(404, "entry not found")
+
+    resp = newHttpResp(303)
+    resp.headers.add((key: "Location", value: "r/$#/$#" % [$entryIdx, UrlEscape(shelf[entryIdx].name)]))
+    await showErrorPage(resp, c)
+
+
+proc cmdNamedRecvHandler(res: UrlResource, c: Client, req: HttpReq): Future[void] {.async.} =
+    var resp: HttpResp
+    var d = CmdResource(res)
+
+    if req.meth != "GET":
+        raise newHttpError(400, "only GET method is accepted")
+
+    var entryIdx = d.recvId
+
+    debug("recv: entryIdx = $#" % [$entryIdx])
+
+    if not shelf.hasKey(entryIdx):
+        raise newHttpError(404, "entry not found")
+
+    resp = newHttpResp(200)
+
+    var transfer = shelf[entryIdx]
+    shelf.del(entryIdx)
+
+    resp.headers.add((key: "Content-Length", value: $(transfer.contentLength)))
+    if not isNil(transfer.contentType):
+        resp.headers.add((key: "Content-Type", value: transfer.contentType))
+    await c.writer.write($resp)
+
+    var totalLen = 0
+    var fileContent = await transfer.reader.read(8192)
+    while fileContent.len() > 0:
+        totalLen += fileContent.len()
+
+        try:
+            await c.writer.write(fileContent)
+        except:
+            var exc = getCurrentException()
+            debug("transfer failed, exc.msg = `$#`" % [exc.msg])
+            transfer.done.fail(exc)
+            c.close()
+            return
+
+        fileContent = await transfer.reader.read(8192)
+
+    transfer.done.complete()
+    debug("recv: entryIdx = $#, transfer completed, totalLen = $#, content-length = $#" % [$entryIdx, $totalLen, $(transfer.contentLength)])
+    if totalLen < transfer.contentLength:
+        # The transfer was canceled on the sender side, we tell the receiver then.
+        c.close()
+
+
+proc cmdListHandler(res: UrlResource, c: Client, req: HttpReq): Future[void] {.async.} =
+    var resp: HttpResp
+
+    if req.meth != "GET":
+        raise newHttpError(400, "only GET method is accepted")
+
+    var jsonArray = newJArray()
+    for i, t in pairs(shelf):
+        var jsonObj = %[
+            (key: "id", val: %(i)),
+            (key: "name", val: %(t.name)),
+            (key: "size", val: %(t.contentLength)),
+            #(key: "tag", val: %(t.tag)),   # TODO
+            (key: "url", val: %("recv?e=$#" % [$i]))
+        ]
+        jsonArray.add(jsonObj)
+
+    var retObj = %[(key: "fileList", val: jsonArray)]
+
+    var content = retObj.pretty()
+    resp = newHttpResp(200)
+    resp.headers.add((key: "Content-Length", value: $(content.len())))
+    resp.headers.add((key: "Content-Type", value: "application/json"))
+    await c.writer.write($resp)
+    await c.writer.write(content)
+
+
+proc newCmdResource(handler: ResourceHandler): CmdResource =
+    new(result)
+    result.handler = handler
+    result.recvId = -1
+    result.recvName = nil
+
+
+method `[]`(res: RootResource, subRes: string): UrlResource =
+    case subRes
+        of "send":
+            return newCmdResource(cmdSendHandler)
+        of "recv":
+            return newCmdResource(cmdRecvHandler)
+        of "list":
+            return newCmdResource(cmdListHandler)
+        of "r":
+            return newCmdResource(cmdNamedRecvHandler)
+        else:
+            raise newHttpError(404, "'$#' not found" % [subRes])
+
+
+method `[]`(res: CmdResource, subRes: string): UrlResource =
+    if res.handler == cmdNamedRecvHandler:
         if res.recvId < 0:
             try:
                 res.recvId = parseInt(subRes)
@@ -351,6 +354,6 @@ when isMainModule:
     var s = newServer("", 8080)
 
     proc handler(c: Client): Future[Client] {.async.} =
-        return (await handleHttpClient(c, dynamicRootFactory))
+        return (await handleHttpClient(c, rootFactory))
 
     waitFor(s.serve(handler))

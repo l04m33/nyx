@@ -10,8 +10,10 @@ import
 
 
 type
+    ResourceHandler* = proc(res: UrlResource, c: Client, r: HttpReq): Future[void]
+
     TUrlResource* = object of RootObj
-        handler*: proc(res: UrlResource, c: Client, r: HttpReq): Future[void]
+        handler*: ResourceHandler
 
     UrlResource* = ref TUrlResource
 
