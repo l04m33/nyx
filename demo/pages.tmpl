@@ -251,25 +251,34 @@
 
                         request.upload.addEventListener("error", function(ev) {
                             console.log(ev);
-                            thiz.showMsg("An error occured. Status: " + request.statusText);
+                            if (request.statusText !== undefined && request.statusText !== "") {
+                                thiz.showMsg("An error occured. Status: " + request.statusText);
+                            } else {
+                                thiz.showMsg("An error occured.");
+                            }
                         }, false);
-
-                        //request.upload.addEventListener("abort", function(ev) {
-                        //    thiz.showMsg("The transfer has been canceled.");
-                        //}, false);
 
                         request.addEventListener("error", function(ev) {
                             console.log(ev);
-                            thiz.showMsg("An error occured. Status: " + request.statusText);
+                            if (request.statusText !== undefined && request.statusText !== "") {
+                                thiz.showMsg("An error occured. Status: " + request.statusText);
+                            } else {
+                                thiz.showMsg("An error occured.");
+                            }
                         }, false);
-
-                        //request.addEventListener("abort", function(ev) {
-                        //    thiz.showMsg("The transfer has been canceled.");
-                        //}, false);
 
                         request.addEventListener("load", function(ev) {
                             if (request.responseText != "Done.") {
-                                thiz.showMsg("An error occured. Status: " + request.statusText + "; Response: " + request.responseText);
+                                var msg = "An error occured.";
+
+                                if (request.statusText !== undefined && request.statusText !== "") {
+                                    msg += (" Status: " + request.statusText);
+                                }
+                                if (request.responseText !== undefined && request.responseText !== "") {
+                                    msg += ("; Response: " + request.responseText);
+                                }
+
+                                thiz.showMsg(msg);
                             } else {
                                 thiz.showMsg(request.responseText);
                             }
