@@ -8,7 +8,7 @@ import
 
 
 proc getDummyListener(): AsyncSocket =
-    result = newAsyncSocket();
+    result = newAsyncSocket()
 
     result.setSockOpt(OptReuseAddr, true)
     result.bindAddr(port=Port(7357), address="127.0.0.1")
@@ -127,8 +127,8 @@ proc testLengthReader() =
 proc testAsyncSocketReader() =
     var ls = getDummyListener()
 
-    var s = newAsyncSocket();
-    waitFor(s.connect("127.0.0.1", Port(7357)));
+    var s = newAsyncSocket()
+    waitFor(s.connect("127.0.0.1", Port(7357)))
     var ps = waitFor(ls.accept())
 
     var r = Reader(newAsyncSocketReader(s))
@@ -158,8 +158,8 @@ proc testAsyncSocketReader() =
 proc testLengthReader2() =
     var ls = getDummyListener()
 
-    var s = newAsyncSocket();
-    waitFor(s.connect("127.0.0.1", Port(7357)));
+    var s = newAsyncSocket()
+    waitFor(s.connect("127.0.0.1", Port(7357)))
     var ps = waitFor(ls.accept())
 
     var r = Reader(newLengthReader(newAsyncSocketReader(s), 10))
@@ -187,8 +187,8 @@ proc testLengthReader2() =
 proc testBoundaryReader2() =
     var ls = getDummyListener()
 
-    var s = newAsyncSocket();
-    waitFor(s.connect("127.0.0.1", Port(7357)));
+    var s = newAsyncSocket()
+    waitFor(s.connect("127.0.0.1", Port(7357)))
     var ps = waitFor(ls.accept())
 
     var boundary = "--thisisboundary"
