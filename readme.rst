@@ -29,3 +29,11 @@ What's the plan?
 Well I don't have a plan, so please don't expect regular updates or
 anything. But if you think it's funny enough, feel free to tell me
 or fork it yourself.
+
+License
+#######
+
+This piece of software is licensed under the terms of the `MIT license`_.
+
+.. _MIT license: http://l04m33.mit-license.org/
+
